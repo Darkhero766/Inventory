@@ -1,0 +1,9 @@
+{
+  "buildCommand": "pnpm --filter @workspace/electronics-inventory build",
+  "outputDirectory": "artifacts/electronics-inventory/dist/public",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "framework": "vite",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
