@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Electronics Inventory"
+description = "A private premium electronics catalog and inventory manager for tracking products, stock, purchases, and sales in one calm workspace."
+version = "1.0.0"
+id = "artifacts/electronics-inventory"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22890
+
+[services.development]
+run = "pnpm --filter @workspace/electronics-inventory run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/electronics-inventory", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/electronics-inventory/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22890"
+BASE_PATH = "/"
