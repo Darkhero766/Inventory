@@ -276,7 +276,9 @@
 .fade-up { animation: fade-up .45s ease both; }
 @keyframes fade-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 .stagger-1 { animation-delay: .04s; } .stagger-2 { animation-delay: .08s; } .stagger-3 { animation-delay: .12s; }
-.image-placeholder { background: linear-gradient(135deg, hsl(40 28% 93%), hsl(164 28% 88%)); color: hsl(216 12% 49%); }
+.image-placeholder { background: linear-gradient(145deg, hsl(42 35% 96%), hsl(164 24% 91%)); color: hsl(216 12% 49%); }
+.category-rail { scrollbar-width: none; }
+.category-rail::-webkit-scrollbar { display: none; }
 
 /**
  * Using the elevate system.
