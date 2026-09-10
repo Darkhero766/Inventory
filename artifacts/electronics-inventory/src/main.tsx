@@ -6,11 +6,9 @@ import { ErrorBoundary } from '@/components/error-boundary';
 
 import './index.css';
 import './ui-polish.css';
+import './ui-upgrade.css';
 
-// Web-only entry point. The app no longer registers a service worker or
-// contains APK/offline boot logic, so the browser always loads the latest
-// deployed JavaScript from Render.
-
+// Web-only entry point. No APK/offline boot logic is registered.
 const root = document.getElementById('root');
 
 if (!root) {
