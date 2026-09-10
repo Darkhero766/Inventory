@@ -1,0 +1,82 @@
+/* Premium UI layer: intentionally dependency-free so the APK remains fully local/offline. */
+html { scroll-behavior: smooth; }
+body { overflow-x: hidden; }
+
+.mobile-page {
+  max-width: 1180px;
+  padding-bottom: 1rem;
+}
+
+.mobile-page > section,
+.mobile-page > div { animation: inventory-enter .38s ease both; }
+
+@keyframes inventory-enter {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.mobile-page .product-image,
+.product-card .product-image {
+  background-image: radial-gradient(circle at 50% 42%, rgba(255,255,255,.96), rgba(241,244,250,.9));
+}
+
+.mobile-page .product-image img,
+.product-card .product-image img {
+  filter: saturate(.98) contrast(1.02);
+}
+
+.brand-mark { transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+a:hover .brand-mark { transform: translateY(-1px); box-shadow: 0 7px 18px rgba(15,23,42,.10); }
+
+/* Brand rail behaves like a premium marketplace filter on narrow screens. */
+.category-rail,
+.brand-rail,
+[class*="overflow-x-auto"] { scrollbar-width: none; }
+.category-rail::-webkit-scrollbar,
+.brand-rail::-webkit-scrollbar,
+[class*="overflow-x-auto"]::-webkit-scrollbar { display: none; }
+
+/* Keep cards dense like the reference while preventing cramped phone layouts. */
+.product-card { min-width: 0; }
+.product-card .product-image { min-height: 180px; }
+
+@media (min-width: 640px) {
+  .product-card .product-image { min-height: 205px; }
+}
+
+@media (min-width: 768px) {
+  .mobile-page { max-width: 1180px; }
+  .inventory-sidebar { flex: 0 0 272px; }
+}
+
+@media (max-width: 767px) {
+  .mobile-page { width: 100%; max-width: none; }
+  .mobile-page h1 { line-height: 1.05; }
+  .mobile-page .product-image { min-height: 0; }
+  .product-card { border-radius: 20px; }
+  .product-card .product-image { min-height: 150px; }
+  .product-card .p-3\.5 { padding: .75rem; }
+  .mobile-page [class*="grid-cols-4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mobile-page [class*="grid-cols-3"] { gap: .55rem; }
+  .mobile-page input,
+  .mobile-page select,
+  .mobile-page textarea { font-size: 16px; }
+}
+
+@media (max-width: 380px) {
+  .mobile-page { padding-left: .05rem; padding-right: .05rem; }
+  .product-card .product-image { min-height: 132px; }
+  .product-card .text-\[14px\] { font-size: 13px; }
+}
+
+/* Safe-area spacing for APKs with gesture navigation. */
+.mobile-nav-shadow { padding-bottom: max(8px, env(safe-area-inset-bottom)); height: calc(72px + env(safe-area-inset-bottom)); }
+
+/* Make dialogs and sheets feel native on phones. */
+@media (max-width: 767px) {
+  [role="dialog"] { max-width: calc(100vw - 20px); max-height: calc(100dvh - 24px); }
+  button, a { touch-action: manipulation; }
+}
+
+/* Offline/slow-network image state is intentional rather than a broken-looking blank card. */
+.image-placeholder { min-height: 100%; border-radius: inherit; }
