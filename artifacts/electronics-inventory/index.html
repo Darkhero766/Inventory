@@ -4,36 +4,22 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
     <title>Electronics Inventory</title>
-    <meta name="description" content="A premium electronics catalog and simple inventory manager." />
+    <meta name="description" content="A premium electronics inventory manager." />
     <meta name="theme-color" content="#f7f8fb" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Electronics Inventory" />
-    <meta name="robots" content="index, follow" />
+    <meta name="apple-mobile-web-app-title" content="Inventory" />
+    <meta name="robots" content="noindex, nofollow" />
     <meta property="og:title" content="Electronics Inventory" />
-    <meta property="og:description" content="A premium electronics catalog and simple inventory manager." />
+    <meta property="og:description" content="A premium electronics inventory manager." />
     <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Electronics Inventory" />
-    <meta name="twitter:description" content="Electronics Inventory — a simple inventory manager." />
+    <link rel="manifest" href="%BASE_URL%manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="%BASE_URL%icon.svg" />
+    <link rel="apple-touch-icon" href="%BASE_URL%icon-192.png" />
   </head>
   <body>
     <div id="root"></div>
-    <script>
-      // One-time cleanup for browsers that previously installed the old PWA
-      // service worker. This prevents an old cached bundle from keeping the
-      // deployed web app on a blank/stale screen.
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then((registrations) => {
-          registrations.forEach((registration) => registration.unregister());
-        });
-        if ('caches' in window) {
-          caches.keys().then((keys) => keys.forEach((key) => caches.delete(key)));
-        }
-      }
-    </script>
     <script type="module" src="/src/main.tsx?web=20260910"></script>
   </body>
 </html>
