@@ -1,6 +1,7 @@
 {
+  "id": "./",
   "name": "Electronics Inventory",
-  "short_name": "Electronics",
+  "short_name": "Inventory",
   "description": "A premium electronics shop inventory manager that works offline.",
   "start_url": "./",
   "scope": "./",
@@ -10,6 +11,7 @@
   "background_color": "#f7f8fb",
   "theme_color": "#202c3d",
   "prefer_related_applications": false,
+  "categories": ["business", "productivity"],
   "icons": [
     {
       "src": "./icon-192.png",
