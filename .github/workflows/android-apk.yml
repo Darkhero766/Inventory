@@ -9,6 +9,7 @@ on:
       - 'lib/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
+      - 'mobile/**'
       - '.github/workflows/android-apk.yml'
 
 permissions:
@@ -17,9 +18,7 @@ permissions:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: artifacts/electronics-inventory
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,30 +40,37 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
-      - name: Install dependencies
-        working-directory: .
+      - name: Install web dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build web app
-        run: pnpm build
+      - name: Build web app for Capacitor
+        run: pnpm --filter @workspace/electronics-inventory build
+        env:
+          CAPACITOR_BUILD: 'true'
 
-      - name: Add Android platform
-        run: pnpm android:add
+      - name: Install Capacitor wrapper
+        working-directory: mobile
+        run: npm install
+
+      - name: Create Android platform
+        working-directory: mobile
+        run: npx cap add android
 
       - name: Sync Capacitor
+        working-directory: mobile
         run: npx cap sync android
 
       - name: Build debug APK
-        working-directory: artifacts/electronics-inventory/android
+        working-directory: mobile/android
         run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Electronics-Inventory-APK
-          path: artifacts/electronics-inventory/android/app/build/outputs/apk/debug/app-debug.apk
+          name: Inventory-Android-APK
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -72,6 +78,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: android-v${{ github.run_number }}
-          name: Electronics Inventory Android v${{ github.run_number }}
+          name: Inventory Android v${{ github.run_number }}
           generate_release_notes: true
-          files: artifacts/electronics-inventory/android/app/build/outputs/apk/debug/app-debug.apk
+          files: mobile/android/app/build/outputs/apk/debug/app-debug.apk
