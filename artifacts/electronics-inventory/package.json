@@ -7,8 +7,7 @@
     "dev": "vite --config vite.config.ts --host 0.0.0.0",
     "build": "vite build --config vite.config.ts",
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "android:build": "CAPACITOR_BUILD=true pnpm run build && cd ../../mobile && npm install --no-audit --no-fund && npx cap add android && npx cap sync android && cd android && ./gradlew assembleDebug"
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {},
   "devDependencies": {
