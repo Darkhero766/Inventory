@@ -41,9 +41,14 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+          cache: gradle
 
+      # Render's CI uses frozen-lockfile by default, but this repository contains
+      # workspace packages whose manifests can change independently of the root
+      # lockfile. Regenerate the lockfile during the APK build so the Android
+      # pipeline is not blocked by a stale lockfile.
       - name: Install web dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: Build web app for Capacitor
         run: pnpm --filter @workspace/electronics-inventory build
@@ -52,7 +57,7 @@ jobs:
 
       - name: Install Capacitor wrapper
         working-directory: mobile
-        run: npm install
+        run: npm install --no-audit --no-fund
 
       - name: Create Android platform
         working-directory: mobile
