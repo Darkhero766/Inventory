@@ -1,57 +1,139 @@
-/* Premium UI layer: dependency-free so the installed app stays fast and offline-friendly. */
+/* Keystone visual polish — premium, calm, touch-first. */
 html { scroll-behavior: smooth; }
-body { overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
+body {
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(124, 105, 240, .07), transparent 28rem),
+    radial-gradient(circle at 92% 12%, rgba(98, 214, 191, .055), transparent 24rem),
+    hsl(var(--background));
+}
 button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button, a { touch-action: manipulation; }
 
-.mobile-page { max-width: 1180px; padding-bottom: 1rem; }
+/* App frame */
+.app-shell { background: transparent; }
+.mobile-page {
+  max-width: 1180px;
+  padding-bottom: 1rem;
+}
 .mobile-page > section,
-.mobile-page > div { animation: inventory-enter .38s ease both; }
-@keyframes inventory-enter { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+.mobile-page > div {
+  animation: inventory-enter .42s cubic-bezier(.2,.75,.25,1) both;
+}
+@keyframes inventory-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
+/* Soft depth without making the UI look heavy */
+.soft-shadow {
+  box-shadow: 0 10px 32px rgba(24, 28, 55, .055), 0 1px 2px rgba(24, 28, 55, .035);
+}
+.product-card,
+.inventory-product-card {
+  box-shadow: 0 8px 28px rgba(24, 28, 55, .045), 0 1px 2px rgba(24, 28, 55, .035);
+  transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+}
+.product-card:hover,
+.inventory-product-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 36px rgba(24, 28, 55, .075), 0 2px 4px rgba(24, 28, 55, .035);
+}
+.product-card:active,
+.inventory-product-card:active { transform: scale(.992); }
+
+/* Search feels like a primary workspace control */
+.mobile-page input[type="text"],
+.mobile-page input:not([type]),
+.mobile-page input[type="search"] {
+  box-shadow: 0 7px 24px rgba(24, 28, 55, .035);
+}
+.mobile-page input:focus,
+.mobile-page select:focus,
+.mobile-page textarea:focus {
+  box-shadow: 0 0 0 4px hsl(var(--primary) / .09), 0 10px 26px rgba(24, 28, 55, .05);
+}
+
+/* Product imagery */
 .mobile-page .product-image,
 .product-card .product-image,
-.inventory-product-card .product-image { background-image: radial-gradient(circle at 50% 42%, rgba(255,255,255,.98), rgba(241,244,250,.92)); }
+.inventory-product-card .product-image {
+  background-image: radial-gradient(circle at 50% 42%, rgba(255,255,255,.99), rgba(241,244,250,.94));
+  overflow: hidden;
+}
 .mobile-page .product-image img,
 .product-card .product-image img,
-.inventory-product-card .product-image img { filter: saturate(.98) contrast(1.02); }
+.inventory-product-card .product-image img {
+  filter: saturate(.98) contrast(1.02);
+  transition: transform .28s cubic-bezier(.2,.7,.2,1);
+}
+.product-card:hover .product-image img,
+.inventory-product-card:hover .product-image img { transform: scale(1.035); }
+.image-placeholder { min-height: 100%; border-radius: inherit; background: radial-gradient(circle at 50% 45%, rgba(255,255,255,.98), rgba(239,242,247,.92)); }
 
-.brand-mark { transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
-a:hover .brand-mark { transform: translateY(-1px); box-shadow: 0 7px 18px rgba(15,23,42,.10); }
-
+/* Brand / category rails */
 .category-rail,
 .brand-rail,
 [class*="overflow-x-auto"] { scrollbar-width: none; }
 .category-rail::-webkit-scrollbar,
 .brand-rail::-webkit-scrollbar,
 [class*="overflow-x-auto"]::-webkit-scrollbar { display: none; }
+.brand-rail,
+.category-rail {
+  box-shadow: 0 8px 26px rgba(24, 28, 55, .035);
+}
+.brand-mark {
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+a:hover .brand-mark { transform: translateY(-1px); box-shadow: 0 7px 18px rgba(15,23,42,.10); }
 
+/* Inventory shelf */
 .product-card { min-width: 0; }
 .product-card .product-image { min-height: 180px; }
-.product-card:active { transform: scale(.992); }
-
-/* Marketplace-style shelf: dense on mobile, spacious on larger screens. */
 .inventory-product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .inventory-product-card { min-width: 0; min-height: 126px; }
 .inventory-product-card .product-image { flex: 0 0 82px; height: 82px; }
 
+/* Buttons get a subtle tactile response */
+button { transition: transform .18s ease, box-shadow .18s ease, background-color .18s ease, border-color .18s ease; }
+button:active { transform: scale(.975); }
+
+/* Bottom navigation */
+.mobile-nav-shadow {
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+  height: calc(76px + env(safe-area-inset-bottom));
+  box-shadow: 0 -16px 38px rgba(20, 24, 48, .075);
+}
+.mobile-nav-shadow a { position: relative; }
+.mobile-nav-shadow a[class*="bg-[hsl(var(--accent))]"]::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  width: 22px;
+  height: 3px;
+  border-radius: 999px;
+  background: hsl(var(--primary));
+}
+
+/* Desktop rhythm */
 @media (min-width: 640px) {
   .product-card .product-image { min-height: 205px; }
   .inventory-product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .inventory-product-card { min-height: 104px; }
   .inventory-product-card .product-image { flex-basis: 92px; height: 92px; }
 }
-
 @media (min-width: 768px) {
   .mobile-page { max-width: 1180px; }
   .inventory-sidebar { flex: 0 0 272px; }
 }
-
 @media (min-width: 1100px) {
   .inventory-product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .inventory-product-card { min-height: 132px; padding: .7rem; }
   .inventory-product-card .product-image { flex-basis: 112px; height: 112px; }
 }
 
+/* Mobile: compact, breathable, never cramped */
 @media (max-width: 767px) {
   .mobile-page { width: 100%; max-width: none; }
   .mobile-page h1 { line-height: 1.05; }
@@ -70,8 +152,8 @@ a:hover .brand-mark { transform: translateY(-1px); box-shadow: 0 7px 18px rgba(1
   .inventory-product-card > span:last-child { align-self: flex-start; }
   .inventory-product-card .brand-mark { display: none; }
   .brand-rail { margin-left: -1px; margin-right: -1px; border-radius: 20px; }
+  [role="dialog"] { max-width: calc(100vw - 20px); max-height: calc(100dvh - 24px); }
 }
-
 @media (max-width: 420px) {
   .mobile-page { padding-left: .05rem; padding-right: .05rem; }
   .product-card .product-image { min-height: 132px; }
@@ -79,24 +161,17 @@ a:hover .brand-mark { transform: translateY(-1px); box-shadow: 0 7px 18px rgba(1
   .inventory-product-grid { gap: .55rem; }
   .inventory-product-card .product-image { height: 104px; }
 }
-
 @media (max-width: 360px) {
   .inventory-product-grid { grid-template-columns: 1fr; }
   .inventory-product-card { flex-direction: row; align-items: center; }
   .inventory-product-card .product-image { width: 76px; height: 76px; flex: 0 0 76px; }
 }
 
-.mobile-nav-shadow { padding-bottom: max(8px, env(safe-area-inset-bottom)); height: calc(72px + env(safe-area-inset-bottom)); }
-
-@media (max-width: 767px) {
-  [role="dialog"] { max-width: calc(100vw - 20px); max-height: calc(100dvh - 24px); }
-  button, a { touch-action: manipulation; }
-  .mobile-nav-shadow { box-shadow: 0 -12px 32px rgba(15,23,42,.08); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
 
-.image-placeholder { min-height: 100%; border-radius: inherit; background: radial-gradient(circle at 50% 45%, rgba(255,255,255,.98), rgba(239,242,247,.92)); }
-
-/* Keep native controls polished when the app is wrapped in Android/iOS WebView. */
+/* Native controls inside mobile browsers */
 input, select, textarea { color-scheme: light; }
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button { opacity: .35; }
