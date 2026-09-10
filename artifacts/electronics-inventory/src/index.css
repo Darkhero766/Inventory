@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap');
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
@@ -77,44 +77,44 @@
   --elevate-1: rgba(0, 0, 0, 0.03);
   --elevate-2: rgba(0, 0, 0, 0.08);
 
-  --background: 42 38% 96%;
-  --foreground: 216 25% 19%;
-  --border: 38 23% 87%;
-  --card: 42 40% 99%;
-  --card-foreground: 216 25% 19%;
-  --card-border: 38 25% 89%;
-  --sidebar: 215 28% 18%;
-  --sidebar-foreground: 42 35% 94%;
-  --sidebar-border: 215 20% 28%;
-  --sidebar-primary: 39 85% 62%;
-  --sidebar-primary-foreground: 216 25% 19%;
-  --sidebar-accent: 215 22% 25%;
-  --sidebar-accent-foreground: 42 35% 94%;
-  --sidebar-ring: 39 85% 62%;
-  --popover: 42 40% 99%;
-  --popover-foreground: 216 25% 19%;
-  --popover-border: 38 25% 89%;
-  --primary: 215 28% 18%;
-  --primary-foreground: 42 35% 96%;
-  --secondary: 39 85% 62%;
-  --secondary-foreground: 216 25% 19%;
-  --muted: 40 24% 91%;
-  --muted-foreground: 216 12% 49%;
-  --accent: 164 28% 86%;
-  --accent-foreground: 166 39% 23%;
-  --destructive: 2 62% 51%;
-  --destructive-foreground: 42 35% 96%;
-  --input: 38 23% 87%;
-  --ring: 39 85% 62%;
-  --chart-1: 39 85% 62%;
-  --chart-2: 164 28% 50%;
-  --chart-3: 215 28% 38%;
-  --chart-4: 2 62% 51%;
-  --chart-5: 28 70% 58%;
-  --app-font-sans: 'DM Sans', sans-serif;
+  --background: 220 24% 97%;
+  --foreground: 224 26% 16%;
+  --border: 222 22% 90%;
+  --card: 0 0% 99%;
+  --card-foreground: 224 26% 16%;
+  --card-border: 222 22% 92%;
+  --sidebar: 0 0% 99%;
+  --sidebar-foreground: 224 26% 16%;
+  --sidebar-border: 222 22% 91%;
+  --sidebar-primary: 247 52% 58%;
+  --sidebar-primary-foreground: 0 0% 99%;
+  --sidebar-accent: 246 54% 96%;
+  --sidebar-accent-foreground: 247 52% 45%;
+  --sidebar-ring: 247 52% 58%;
+  --popover: 0 0% 99%;
+  --popover-foreground: 224 26% 16%;
+  --popover-border: 222 22% 91%;
+  --primary: 247 52% 58%;
+  --primary-foreground: 0 0% 99%;
+  --secondary: 220 65% 75%;
+  --secondary-foreground: 224 26% 16%;
+  --muted: 220 23% 94%;
+  --muted-foreground: 222 11% 51%;
+  --accent: 246 54% 95%;
+  --accent-foreground: 247 52% 45%;
+  --destructive: 346 64% 56%;
+  --destructive-foreground: 0 0% 99%;
+  --input: 222 22% 88%;
+  --ring: 247 52% 58%;
+  --chart-1: 247 52% 58%;
+  --chart-2: 220 65% 75%;
+  --chart-3: 222 30% 34%;
+  --chart-4: 346 64% 56%;
+  --chart-5: 168 38% 53%;
+  --app-font-sans: 'Plus Jakarta Sans', sans-serif;
   --app-font-serif: Georgia, serif;
   --app-font-mono: 'Space Mono', monospace;
-  --radius: 1rem;
+  --radius: 1.15rem;
   --shadow-2xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0); /*replace with H S L */
   --shadow-xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0); /*replace with H S L */
   --shadow-sm:
@@ -270,15 +270,22 @@
 }
 
 .app-shell { min-height: 100dvh; background: hsl(var(--background)); }
-.soft-shadow { box-shadow: 0 12px 30px hsl(215 28% 18% / .07); }
+.soft-shadow { box-shadow: 0 12px 30px hsl(224 28% 30% / .06); }
 .soft-shadow-hover { transition: transform .25s ease, box-shadow .25s ease; }
-.soft-shadow-hover:hover { transform: translateY(-3px); box-shadow: 0 16px 34px hsl(215 28% 18% / .12); }
+.soft-shadow-hover:hover { transform: translateY(-3px); box-shadow: 0 16px 34px hsl(224 28% 30% / .12); }
 .fade-up { animation: fade-up .45s ease both; }
 @keyframes fade-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 .stagger-1 { animation-delay: .04s; } .stagger-2 { animation-delay: .08s; } .stagger-3 { animation-delay: .12s; }
 .image-placeholder { background: linear-gradient(145deg, hsl(42 35% 96%), hsl(164 24% 91%)); color: hsl(216 12% 49%); }
 .category-rail { scrollbar-width: none; }
 .category-rail::-webkit-scrollbar { display: none; }
+.mobile-page { max-width: 560px; }
+.mobile-nav-shadow { box-shadow: 0 -10px 28px hsl(224 28% 30% / .08); }
+.safe-bottom { padding-bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
+@media (min-width: 768px) {
+  .mobile-page { max-width: 760px; }
+  .safe-bottom { padding-bottom: 2.5rem; }
+}
 
 /**
  * Using the elevate system.

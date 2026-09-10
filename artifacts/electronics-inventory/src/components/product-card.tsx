@@ -23,15 +23,16 @@ export function BrandMark({ brand, size = 'md' }: { brand: string; size?: 'sm' |
 export function ProductImage({ product, className = '' }: { product: Product; className?: string }) {
   const [failed, setFailed] = useState(false);
   return <div className={`product-image relative flex items-center justify-center overflow-hidden ${className}`}>
-    {!failed && <img loading="lazy" decoding="async" src={product.image} alt={product.name} className="h-full w-full object-contain p-5 mix-blend-multiply transition-transform duration-500 group-hover:scale-[1.04]" onError={() => setFailed(true)} />}
-    {failed && <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-[hsl(40_25%_95%)] text-[hsl(var(--muted-foreground))]"><Package className="h-8 w-8 opacity-35" /><span className="text-[10px] font-medium">Image unavailable</span></div>}
+    {!failed && <img loading="lazy" decoding="async" src={product.image} alt={product.name} className="h-full w-full object-contain p-3 mix-blend-multiply transition-transform duration-500 group-hover:scale-[1.04]" onError={() => setFailed(true)} />}
+    {failed && <div className="image-placeholder flex h-full w-full flex-col items-center justify-center gap-1 text-[hsl(var(--muted-foreground))]"><Package className="h-7 w-7 opacity-35" /><span className="text-[10px] font-medium">Image unavailable</span></div>}
   </div>;
 }
 
 export function StatusPill({ product }: { product: Product }) {
   const status = statusOf(product);
-  const styles = status === 'IN STOCK' ? 'bg-[hsl(164_28%_86%)] text-[hsl(166_39%_23%)]' : status === 'LOW STOCK' ? 'bg-[hsl(39_85%_85%)] text-[hsl(32_62%_31%)]' : 'bg-[hsl(2_62%_92%)] text-[hsl(2_62%_39%)]';
-  return <span data-testid={`status-product-${product.id}`} className={`inline-flex rounded-full px-2.5 py-1 font-mono text-[9px] font-bold tracking-[.08em] ${styles}`}>{status}</span>;
+  const styles = status === 'IN STOCK' ? 'bg-[hsl(159_39%_91%)] text-[hsl(159_44%_31%)]' : status === 'LOW STOCK' ? 'bg-[hsl(43_78%_92%)] text-[hsl(35_61%_35%)]' : 'bg-[hsl(348_70%_94%)] text-[hsl(346_58%_42%)]';
+  const label = status === 'IN STOCK' ? 'In stock' : status === 'LOW STOCK' ? 'Low stock' : 'Out of stock';
+  return <span data-testid={`status-product-${product.id}`} className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 font-mono text-[8px] font-bold tracking-[.02em] ${styles}`}>{label}</span>;
 }
 
 export function ProductCard({ product }: { product: Product }) {
