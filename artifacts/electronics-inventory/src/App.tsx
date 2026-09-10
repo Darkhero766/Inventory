@@ -150,5 +150,14 @@ function SalesPage() {
 }
 
 function Router(){ return <InventoryProvider><InventoryShell><ErrorBoundary><Switch><Route path="/" component={HomePage}/><Route path="/inventory" component={InventoryPage}/><Route path="/inventory/new" component={ProductFormPage}/><Route path="/inventory/:id/edit" component={ProductFormPage}/><Route path="/product/:id" component={ProductDetailScreen}/><Route path="/stock-history" component={HistoryPage}/><Route path="/purchases" component={PurchasesPage}/><Route path="/purchases/new" component={PurchaseFormPage}/><Route path="/sales" component={SalesPage}/><Route component={NotFound}/></Switch></ErrorBoundary></InventoryShell></InventoryProvider>; }
-function App(){ return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/,'')}><Router/></WouterRouter><Toaster/></TooltipProvider></QueryClientProvider>; }
+
+// Capacitor loads the Vite bundle from the local WebView root. Vite needs
+// relative asset URLs there (./), but Wouter's base is a URL path prefix and
+// must remain empty for the local root. Passing "." makes every route fail to
+// match, which leaves only the shell/header visible in the APK.
+function App(){
+  const viteBase = import.meta.env.BASE_URL;
+  const routerBase = viteBase === './' ? '' : viteBase.replace(/\/$/,'');
+  return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={routerBase}><Router/></WouterRouter><Toaster/></TooltipProvider></QueryClientProvider>;
+}
 export default App;
