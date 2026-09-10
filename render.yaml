@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: electronics-inventory
+    runtime: node
+    rootDir: artifacts/electronics-inventory
+    buildCommand: corepack enable && pnpm install --no-frozen-lockfile && pnpm run build
+    startCommand: pnpm run serve -- --host 0.0.0.0
