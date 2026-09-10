@@ -1,6 +1,6 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { BarChart3, Boxes, ClipboardList, Home, Menu, MoreHorizontal, ShoppingCart, Sparkles, X } from 'lucide-react';
+import { BarChart3, Boxes, CheckCircle2, ClipboardList, Home, Menu, MoreHorizontal, ShoppingCart, Sparkles, WifiOff, X } from 'lucide-react';
 
 const nav = [
   { href: '/', label: 'Home', icon: Home },
@@ -8,6 +8,20 @@ const nav = [
   { href: '/purchases', label: 'Purchases', icon: ClipboardList },
   { href: '/sales', label: 'Sales', icon: ShoppingCart },
 ];
+
+function OfflineStatus() {
+  const [online, setOnline] = useState(() => typeof navigator === 'undefined' ? true : navigator.onLine);
+  useEffect(() => {
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
+  return online
+    ? <span className="hidden items-center gap-1.5 rounded-full border border-emerald-200/70 bg-emerald-50 px-2.5 py-1 text-[9px] font-bold text-emerald-700 sm:flex"><CheckCircle2 className="h-3 w-3" /> Ready</span>
+    : <span className="flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[9px] font-bold text-amber-700"><WifiOff className="h-3 w-3" /> Offline</span>;
+}
 
 export function InventoryShell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
@@ -48,7 +62,7 @@ export function InventoryShell({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-20 flex h-[68px] items-center justify-between border-b border-[hsl(var(--border)/.8)] bg-[hsl(var(--background)/.84)] px-4 backdrop-blur-xl md:px-9">
         <button className="flex h-10 w-10 items-center justify-center rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card)/.7)] md:hidden" onClick={() => setOpen(true)} aria-label="Open menu"><Menu className="h-5 w-5" /></button>
         <div className="hidden md:block"><p className="font-mono text-[9px] font-bold uppercase tracking-[.18em] text-[hsl(var(--muted-foreground))]">Electronics stock desk</p><p className="mt-1 text-xs font-semibold">Inventory workspace</p></div>
-        <div className="ml-auto flex items-center gap-3"><div className="hidden text-right sm:block"><p className="text-xs font-bold">Aarav Mehta</p><p className="font-mono text-[10px] text-[hsl(var(--muted-foreground))]">Owner / Admin</p></div><div className="flex h-9 w-9 items-center justify-center rounded-full bg-[hsl(var(--accent))] text-xs font-extrabold text-[hsl(var(--accent-foreground))] ring-4 ring-[hsl(var(--accent)/.45)]">AM</div></div>
+        <div className="ml-auto flex items-center gap-2.5"><OfflineStatus /><div className="hidden text-right sm:block"><p className="text-xs font-bold">Aarav Mehta</p><p className="font-mono text-[10px] text-[hsl(var(--muted-foreground))]">Owner / Admin</p></div><div className="flex h-9 w-9 items-center justify-center rounded-full bg-[hsl(var(--accent))] text-xs font-extrabold text-[hsl(var(--accent-foreground))] ring-4 ring-[hsl(var(--accent)/.45)]">AM</div></div>
       </header>
 
       <main className="mx-auto w-full max-w-[1500px] flex-1 px-3 pb-24 pt-4 sm:px-5 md:px-9 md:pb-10 md:pt-8">{children}</main>
