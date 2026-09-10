@@ -1,0 +1,9 @@
+{
+  "appId": "com.darkhero.inventory",
+  "appName": "Inventory",
+  "webDir": "../artifacts/electronics-inventory/dist/public",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}
