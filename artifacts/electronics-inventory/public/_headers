@@ -1,0 +1,4 @@
+/*
+  PWA installability is handled by the manifest. Keep the app private because
+  this is an internal inventory tool.
+*/
