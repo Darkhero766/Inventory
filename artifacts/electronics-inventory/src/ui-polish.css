@@ -2,33 +2,21 @@
 html { scroll-behavior: smooth; }
 body { overflow-x: hidden; }
 
-.mobile-page {
-  max-width: 1180px;
-  padding-bottom: 1rem;
-}
-
+.mobile-page { max-width: 1180px; padding-bottom: 1rem; }
 .mobile-page > section,
 .mobile-page > div { animation: inventory-enter .38s ease both; }
-
-@keyframes inventory-enter {
-  from { opacity: 0; transform: translateY(7px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+@keyframes inventory-enter { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
 
 .mobile-page .product-image,
-.product-card .product-image {
-  background-image: radial-gradient(circle at 50% 42%, rgba(255,255,255,.96), rgba(241,244,250,.9));
-}
-
+.product-card .product-image,
+.inventory-product-card .product-image { background-image: radial-gradient(circle at 50% 42%, rgba(255,255,255,.96), rgba(241,244,250,.9)); }
 .mobile-page .product-image img,
-.product-card .product-image img {
-  filter: saturate(.98) contrast(1.02);
-}
+.product-card .product-image img,
+.inventory-product-card .product-image img { filter: saturate(.98) contrast(1.02); }
 
 .brand-mark { transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
 a:hover .brand-mark { transform: translateY(-1px); box-shadow: 0 7px 18px rgba(15,23,42,.10); }
 
-/* Brand rail behaves like a premium marketplace filter on narrow screens. */
 .category-rail,
 .brand-rail,
 [class*="overflow-x-auto"] { scrollbar-width: none; }
@@ -36,17 +24,28 @@ a:hover .brand-mark { transform: translateY(-1px); box-shadow: 0 7px 18px rgba(1
 .brand-rail::-webkit-scrollbar,
 [class*="overflow-x-auto"]::-webkit-scrollbar { display: none; }
 
-/* Keep cards dense like the reference while preventing cramped phone layouts. */
 .product-card { min-width: 0; }
 .product-card .product-image { min-height: 180px; }
 
+/* Amazon-like responsive shelf: 1 column phone, 2 tablet, 3 desktop. */
+.inventory-product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.inventory-product-card { min-width: 0; min-height: 104px; }
+.inventory-product-card .product-image { flex: 0 0 92px; height: 92px; }
+
 @media (min-width: 640px) {
   .product-card .product-image { min-height: 205px; }
+  .inventory-product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (min-width: 768px) {
   .mobile-page { max-width: 1180px; }
   .inventory-sidebar { flex: 0 0 272px; }
+}
+
+@media (min-width: 1100px) {
+  .inventory-product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .inventory-product-card { min-height: 132px; padding: .7rem; }
+  .inventory-product-card .product-image { flex-basis: 112px; height: 112px; }
 }
 
 @media (max-width: 767px) {
@@ -61,22 +60,24 @@ a:hover .brand-mark { transform: translateY(-1px); box-shadow: 0 7px 18px rgba(1
   .mobile-page input,
   .mobile-page select,
   .mobile-page textarea { font-size: 16px; }
+  .inventory-product-grid { grid-template-columns: 1fr; gap: .65rem; }
+  .inventory-product-card { min-height: 94px; }
+  .inventory-product-card .product-image { flex-basis: 76px; height: 76px; }
 }
 
 @media (max-width: 380px) {
   .mobile-page { padding-left: .05rem; padding-right: .05rem; }
   .product-card .product-image { min-height: 132px; }
   .product-card .text-\[14px\] { font-size: 13px; }
+  .inventory-product-card { gap: .55rem; padding: .55rem; }
+  .inventory-product-card .product-image { flex-basis: 68px; height: 68px; }
 }
 
-/* Safe-area spacing for APKs with gesture navigation. */
 .mobile-nav-shadow { padding-bottom: max(8px, env(safe-area-inset-bottom)); height: calc(72px + env(safe-area-inset-bottom)); }
 
-/* Make dialogs and sheets feel native on phones. */
 @media (max-width: 767px) {
   [role="dialog"] { max-width: calc(100vw - 20px); max-height: calc(100dvh - 24px); }
   button, a { touch-action: manipulation; }
 }
 
-/* Offline/slow-network image state is intentional rather than a broken-looking blank card. */
 .image-placeholder { min-height: 100%; border-radius: inherit; }
