@@ -5,10 +5,12 @@ import { defineConfig } from 'vite';
 
 import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
 
-// Replit provides PORT/BASE_PATH during development. Vercel does not,
-// so keep production builds independent of those environment variables.
+// Replit provides PORT/BASE_PATH during development. Capacitor APK builds
+// need relative asset URLs so the app works from the local WebView bundle.
 const port = Number(process.env.PORT || 5000);
-const basePath = process.env.BASE_PATH || '/';
+const basePath = process.env.CAPACITOR_BUILD === 'true'
+  ? './'
+  : (process.env.BASE_PATH || '/');
 
 const devPlugins =
   process.env.REPL_ID !== undefined
