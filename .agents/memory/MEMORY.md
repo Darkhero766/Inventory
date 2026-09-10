@@ -1,0 +1,1 @@
+- [Vite/Radix sourcemaps](vite-radix-sourcemaps.md) — Vite-only Radix wrappers should not retain Next.js module directives; keep dev overlays/sourcemaps mode-gated.
