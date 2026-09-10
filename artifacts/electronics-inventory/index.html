@@ -21,6 +21,19 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // One-time cleanup for browsers that previously installed the old PWA
+      // service worker. This prevents an old cached bundle from keeping the
+      // deployed web app on a blank/stale screen.
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          registrations.forEach((registration) => registration.unregister());
+        });
+        if ('caches' in window) {
+          caches.keys().then((keys) => keys.forEach((key) => caches.delete(key)));
+        }
+      }
+    </script>
+    <script type="module" src="/src/main.tsx?web=20260910"></script>
   </body>
 </html>
