@@ -2,11 +2,15 @@ export type Category = 'Mobile' | 'Laptop' | 'TV' | 'Refrigerator' | 'AC' | 'Aud
 export type Product = {
   id: string; name: string; brand: string; category: Category; model: string; sku: string;
   purchasePrice: number; sellingPrice: number; mrp: number; quantity: number; minStock: number;
-  warranty: string; image: string; createdAt: string;
+  warranty: string; image: string; createdAt: string; serialNumber?: string; imei?: string;
 };
 export type StockEntry = { id: string; productId: string; productName: string; type: 'PURCHASE' | 'SALE' | 'ADJUSTMENT'; quantity: number; note: string; date: string; };
 export type Purchase = { id: string; supplier: string; invoice: string; date: string; productId: string; productName: string; quantity: number; purchasePrice: number; total: number; };
-export type Sale = { id: string; date: string; invoice?: string; customerName?: string; items: { productId: string; productName: string; quantity: number; price: number }[]; subtotal: number; discount: number; total: number; payment: string; };
+export type SaleItem = { productId: string; productName: string; quantity: number; price: number; discount?: number; serialNumber?: string; imei?: string; };
+export type Sale = { id: string; date: string; invoice?: string; customerId?: string; customerName?: string; items: SaleItem[]; subtotal: number; discount: number; total: number; payment: string; purchaseCost?: number; profit?: number; discountType?: 'fixed'|'percent'; discountValue?: number; status?: 'COMPLETED'|'CANCELLED'; };
+export type Customer = { id: string; name: string; phone: string; alternatePhone?: string; email?: string; address?: string; createdAt: string; };
+export type EmiPlan = { id: string; saleId: string; customerId: string; totalAmount: number; downPayment: number; financedAmount: number; emiAmount: number; installments: number; paidInstallments: number; outstandingAmount: number; startDate: string; nextDueDate: string | null; endDate: string; frequency: 'MONTHLY'; status: 'ACTIVE'|'OVERDUE'|'PAID'; };
+export type EmiPayment = { id: string; emiPlanId: string; installmentNumber: number; dueDate: string; amount: number; paidDate?: string; status: 'PAID'|'UPCOMING'|'OVERDUE'; };
 
 const pics = {
   phone: 'https://images.unsplash.com/photo-1592899677977-9c10ca588bbd?auto=format&fit=crop&w=1000&q=90',
