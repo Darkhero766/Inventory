@@ -16,8 +16,8 @@ src=src.replace(
 "if(payment==='EMI'&&cid){")
 
 src=src.replace(
-"function SalesPage(){const {products,customers,upsertCustomer,addSale,createEmiPlan}=useInventory();const [search=",
-"function SalesPage(){const {products,customers,upsertCustomer,addSale,createEmiPlan}=useInventory();const [,setLocation]=useLocation();const [search=")
+"function SalesPage(){const {products,customers,upsertCustomer,addSale,createEmiPlan}=useInventory();const [search,setSearch]",
+"function SalesPage(){const {products,customers,upsertCustomer,addSale,createEmiPlan}=useInventory();const [,setLocation]=useLocation();const [search,setSearch]")
 
 src=src.replace(
 "const add=(p:Product)=>setCart(prev=>prev.some(i=>i.productId===p.id)?prev.map(i=>i.productId===p.id?{...i,quantity:Math.min(p.quantity,i.quantity+1)}:i):[...prev,{productId:p.id,quantity:1}]);",
