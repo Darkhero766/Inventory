@@ -1,4 +1,4 @@
-# Supabase + Google + relational inventory setup
+# Supabase + Google + multi-tenant inventory setup
 
 The app uses Supabase Auth for real multi-device sessions and Supabase Postgres for relational inventory data. The browser only uses the public/publishable key. Never put a service-role/secret key in Vite environment variables.
 
@@ -8,11 +8,14 @@ In **Supabase → SQL Editor**, run these files in order:
 
 1. `supabase/schema.sql`
 2. `supabase/002_auth_and_workspace.sql`
-3. `supabase/003_relational_sync.sql`
+3. `supabase/003_complete_backend.sql`
+4. `supabase/003_relational_sync.sql`
+5. `supabase/004_disable_email_confirmation.sql` (checklist only)
+6. `supabase/005_customer_sales_rls.sql`
+7. `supabase/006_multitenant_admin.sql`
+8. `supabase/007_conflict_indexes.sql`
 
-The third migration adds client IDs, relational reconciliation, authenticated-only cloud persistence, and the atomic `complete_sale` database function. Sales are protected against insufficient stock and server-side profit is calculated from purchase cost.
-
-The legacy `inventory_state` table remains as a compatibility snapshot for history/purchases and as a fallback while a project is being migrated. Customers, products, sales, sale items and EMI records are now mirrored into their proper relational tables.
+The ownership migrations make every shop's customers, products, sales, sale items and EMI records tenant-scoped by the authenticated Supabase user ID. SKU, invoice and client IDs are also scoped per owner. The database keeps RLS enabled and the sale/EMI functions validate ownership server-side.
 
 ## 2. Render environment variables
 
@@ -29,7 +32,7 @@ Redeploy after saving them.
 
 ## 3. Disable email verification
 
-This private shop intentionally does **not** require email verification.
+The app is designed for immediate account creation, but **Supabase Auth's Confirm Email setting is a project-level Auth setting and cannot be disabled by frontend SQL**.
 
 In Supabase go to:
 
@@ -37,11 +40,9 @@ In Supabase go to:
 
 Turn **Confirm Email** / **Email Confirmations** **OFF**.
 
-When Confirm Email is disabled, Supabase can return a session immediately from `signUp()` instead of requiring the user to confirm the email first.
+After that, Create Account can immediately sign in without sending a confirmation link.
 
-The app's Create Account flow is already written for immediate sign-in and no longer tells users to check their email.
-
-> Security note: disabling email confirmation means an attacker can register an address they do not control. For a private shop, keep signup access limited to people who should have workspace access, and consider CAPTCHA or an invite-only flow if the app becomes public.
+> Security note: disabling email confirmation means an attacker can register an address they do not control. If this platform becomes public, use invite-only onboarding, CAPTCHA, or another access-control layer.
 
 ## 4. Enable Google login
 
@@ -65,7 +66,7 @@ In **Authentication → URL Configuration**:
 
 - Set **Site URL** to the deployed Render origin.
 - Add the deployed Render origin to **Redirect URLs**.
-- The app sends `window.location.origin` as the OAuth redirect, so the same build works on the Render domain and installed/PWA browser contexts using that origin.
+- The app sends `window.location.origin` as the OAuth redirect.
 
 For local development also add your local origin, for example:
 
@@ -81,33 +82,38 @@ Google sign-in is intentionally restricted to:
 nightowlclub72@gmail.com
 ```
 
-A Google account with another email is signed out immediately and cannot enter the private workspace.
+The platform admin dashboard is available at `/admin` only to that email. Its database RPC also checks the authenticated JWT email, so changing the frontend role flag cannot grant admin access.
 
-Email/password accounts created through **Create account** are staff accounts. The admin email remains reserved for the workspace owner.
+The dashboard shows shop-owner counts and aggregate per-owner products, customers, sales, revenue and outstanding EMI. It never exposes passwords, OAuth secrets or service-role credentials.
 
-## 7. Multi-device behavior
+## 7. Multi-tenant behavior
 
-Supabase Auth persists the authenticated session, so the same account can sign in on a phone, laptop, tablet, or desktop. The app now requires an authenticated Supabase session for cloud sync; it no longer creates anonymous Supabase users.
+Every authenticated shop owner gets an isolated workspace:
 
-The relational cloud sync mirrors:
+- Local browser inventory state is cleared when switching to a different Supabase user.
+- New staff accounts start with an empty inventory instead of inheriting the previous shop's products.
+- Existing owner data is hydrated back from Supabase on that owner's next login/device.
+- RLS uses `owner_id = auth.uid()`.
+- The snapshot sync RPC writes the caller's `owner_id` rather than trusting a browser-supplied owner ID.
+- SKU, invoice number and client IDs can safely repeat across different shops.
 
-- Customers
-- Products
-- Sales
-- Sale items
-- EMI plans
-- EMI payments
+## 8. Dedicated sales checkout
 
-The database has RLS enabled and all browser database operations are performed with the public/publishable key plus the signed-in user's session.
+The Sales tab now uses a two-step flow: select products, then move to `/sales/checkout`. The checkout page handles customer selection/creation, discounts, mixed payments and EMI schedule creation. EMI plans use the same sale ID as the completed sale, fixing the previous broken relationship.
 
-## 8. Important deployment checklist
+The existing inventory, customer and sale pages remain intact.
 
-Before using the live app:
+## 9. Multi-device behavior
 
-- Run all three SQL files.
+Supabase Auth persists the authenticated session, so the same account can sign in on a phone, laptop, tablet, or desktop. The same owner's cloud records are restored on each device.
+
+## 10. Important deployment checklist
+
+- Run all eight SQL files in order.
 - Configure Render `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
 - Disable **Confirm Email** in Supabase Email provider settings.
 - Enable Google provider and configure the Google callback URL.
 - Set Supabase Site URL and Redirect URLs to the live Render origin.
 - Never add a service-role/secret key to GitHub, Render client environment variables, or the browser.
-- Sign in once with the admin account before expecting cloud data to synchronize.
+- Sign in once with the admin account and open `/admin` to verify the owner dashboard.
+- Create a second test account and confirm it starts with its own empty customers/products/sales, then sign back into the admin account to confirm the data remains separate.
