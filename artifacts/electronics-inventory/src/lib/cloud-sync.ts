@@ -4,6 +4,7 @@ const KEYS = ['keystone-products','keystone-history','keystone-purchases','keyst
 let hydrating = false;
 let timer: ReturnType<typeof setTimeout> | undefined;
 let bootPromise: Promise<boolean> | null = null;
+let syncInstalled = false;
 
 const snapshot = () => Object.fromEntries(KEYS.map(key => {
   try { return [key, JSON.parse(localStorage.getItem(key) || 'null')]; } catch { return [key, null]; }
@@ -31,21 +32,15 @@ async function hydrateRelational() {
     id:p.client_id,name:p.name,brand:p.brand,category:p.category,model:p.model,sku:p.sku,purchasePrice:Number(p.purchase_price),sellingPrice:Number(p.selling_price),mrp:Number(p.mrp),quantity:Number(p.stock),minStock:Number(p.min_stock),warranty:p.warranty ?? '',image:p.image_url ?? '',createdAt:p.created_at,serialNumber:p.serial_number ?? undefined,imei:p.imei ?? undefined,
   }));
   const customers = (customersRes.data ?? []).map((c:any) => ({ id:c.client_id,name:c.name,phone:c.phone,alternatePhone:c.alternate_phone ?? undefined,email:c.email ?? undefined,address:c.address ?? undefined,createdAt:c.created_at }));
-  const customerByDb = new Map((customersRes.data ?? []).map((c:any) => [c.client_id,c]));
-  const saleByDb = new Map((salesRes.data ?? []).map((s:any) => [s.client_id,s]));
-  const productByDb = new Map((productsRes.data ?? []).map((p:any) => [p.client_id,p]));
   const itemsBySale = new Map<string, any[]>();
   for (const row of itemsRes.data ?? []) { const list=itemsBySale.get(row.sale_id) ?? []; list.push(row); itemsBySale.set(row.sale_id,list); }
-  const dbSaleIdToClient = new Map((salesRes.data ?? []).map((s:any) => [s.client_id,s.client_id]));
   const sales = (salesRes.data ?? []).map((s:any) => ({
     id:s.client_id,date:s.sale_date,invoice:s.invoice_number,customerId:s.customers?.client_id,customerName:s.customers?.name,
-    items:(itemsBySale.get(s.id) ?? []).map((i:any) => ({ productId:i.products?.client_id ?? i.product_id,productName:i.products?.name ?? 'Product',quantity:Number(i.quantity),price:Number(i.unit_price),discount:Number(i.discount ?? 0),serialNumber:i.products?.serial_number ?? undefined,imei:i.products?.imei ?? undefined })),
-    subtotal:Number(s.subtotal),discount:Number(s.discount_amount),total:Number(s.final_amount),payment:s.payment_method,purchaseCost:Number(s.purchase_cost),profit:Number(s.profit),discountType:s.discount_type ?? undefined,discountValue:Number(s.discount_value ?? 0),status:s.status,
+    items:[],subtotal:Number(s.subtotal),discount:Number(s.discount_amount),total:Number(s.final_amount),payment:s.payment_method,purchaseCost:Number(s.purchase_cost),profit:Number(s.profit),discountType:s.discount_type ?? undefined,discountValue:Number(s.discount_value ?? 0),status:s.status,
   }));
-  // sale_items uses database sale_id; convert that relation to the local client id.
   for (const sale of sales) {
     const raw = (salesRes.data ?? []).find((s:any) => s.client_id === sale.id);
-    if (raw) sale.items = (itemsBySale.get(raw.id) ?? []).map((i:any) => ({ productId:i.products?.client_id ?? i.product_id,productName:i.products?.name ?? 'Product',quantity:Number(i.quantity),price:Number(i.unit_price),discount:Number(i.discount ?? 0),serialNumber:i.products?.serial_number ?? undefined,imei:i.products?.imei ?? undefined }));
+    sale.items = (itemsBySale.get(raw?.id) ?? []).map((i:any) => ({ productId:i.products?.client_id ?? i.product_id,productName:i.products?.name ?? 'Product',quantity:Number(i.quantity),price:Number(i.unit_price),discount:Number(i.discount ?? 0),serialNumber:i.products?.serial_number ?? undefined,imei:i.products?.imei ?? undefined }));
   }
   const emiDbToClient = new Map((emiRes.data ?? []).map((e:any) => [e.id,e.client_id]));
   const emiPlans = (emiRes.data ?? []).map((e:any) => ({ id:e.client_id,saleId:(salesRes.data ?? []).find((s:any)=>s.id===e.sale_id)?.client_id ?? e.sale_id,customerId:(customersRes.data ?? []).find((c:any)=>c.id===e.customer_id)?.client_id ?? e.customer_id,totalAmount:Number(e.total_amount),downPayment:Number(e.down_payment),financedAmount:Number(e.financed_amount),emiAmount:Number(e.emi_amount),installments:Number(e.installments),paidInstallments:Number(e.paid_installments),outstandingAmount:Number(e.outstanding_amount),startDate:e.start_date,nextDueDate:e.next_due_date,endDate:e.end_date,frequency:e.frequency,status:e.status }));
@@ -55,7 +50,6 @@ async function hydrateRelational() {
   localStorage.setItem('keystone-sales',JSON.stringify(sales));
   localStorage.setItem('keystone-emi-plans',JSON.stringify(emiPlans));
   localStorage.setItem('keystone-emi-payments',JSON.stringify(emiPayments));
-  void customerByDb; void saleByDb; void productByDb; void dbSaleIdToClient;
   return true;
 }
 
@@ -91,4 +85,20 @@ export function syncInventoryState() {
   },350);
 }
 
+/**
+ * The UI intentionally keeps a fast local cache. This bridge makes every
+ * inventory/customer/sale/EMI write cloud-backed without forcing every page
+ * to know about Supabase. Hydration is ignored so boot cannot echo data back.
+ */
+function installLocalStorageSync() {
+  if (syncInstalled || typeof window === 'undefined') return;
+  syncInstalled = true;
+  const original = Storage.prototype.setItem;
+  Storage.prototype.setItem = function(key: string, value: string) {
+    original.call(this, key, value);
+    if (this === window.localStorage && (KEYS as readonly string[]).includes(key)) syncInventoryState();
+  };
+}
+
+installLocalStorageSync();
 export const cloudSyncConfigured=()=>Boolean(supabase);
