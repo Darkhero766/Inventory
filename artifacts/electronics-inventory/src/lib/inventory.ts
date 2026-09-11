@@ -1,3 +1,5 @@
+import { syncInventoryState } from './cloud-sync';
+
 export type Category = 'Mobile' | 'Laptop' | 'TV' | 'Refrigerator' | 'AC' | 'Audio' | 'Camera' | 'Accessories';
 export type Product = {
   id: string; name: string; brand: string; category: Category; model: string; sku: string;
@@ -13,24 +15,10 @@ export type EmiPlan = { id: string; saleId: string; customerId: string; totalAmo
 export type EmiPayment = { id: string; emiPlanId: string; installmentNumber: number; dueDate: string; amount: number; paidDate?: string; status: 'PAID'|'UPCOMING'|'OVERDUE'; };
 
 const pics = {
-  phone: 'https://images.unsplash.com/photo-1592899677977-9c10ca588bbd?auto=format&fit=crop&w=1000&q=90',
-  phone2: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=1000&q=90',
-  phone3: 'https://images.unsplash.com/photo-1556656793-08538906a9f8?auto=format&fit=crop&w=1000&q=90',
-  laptop: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=1000&q=90',
-  laptop2: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=1000&q=90',
-  laptop3: 'https://images.unsplash.com/photo-1531297484001-80022131f5a1?auto=format&fit=crop&w=1000&q=90',
-  tv: 'https://images.unsplash.com/photo-1593784991095-a205069470b6?auto=format&fit=crop&w=1000&q=90',
-  tv2: 'https://images.unsplash.com/photo-1461151304267-38535e780c79?auto=format&fit=crop&w=1000&q=90',
-  camera: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1000&q=90',
-  camera2: 'https://images.unsplash.com/photo-1606986628253-4b2c6c7f2f77?auto=format&fit=crop&w=1000&q=90',
-  audio: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1000&q=90',
-  audio2: 'https://images.unsplash.com/photo-1484704849700-f032a568e944?auto=format&fit=crop&w=1000&q=90',
-  speaker: 'https://images.unsplash.com/photo-1545454675-3531b543be5d?auto=format&fit=crop&w=1000&q=90',
-  fridge: 'https://images.unsplash.com/photo-1584568694244-14fbdf83bd30?auto=format&fit=crop&w=1000&q=90',
-  fridge2: 'https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?auto=format&fit=crop&w=1000&q=90',
-  ac: 'https://images.unsplash.com/photo-1631545806609-7e0b6a58e2d1?auto=format&fit=crop&w=1000&q=90',
-  printer: 'https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?auto=format&fit=crop&w=1000&q=90',
-  router: 'https://images.unsplash.com/photo-1606904825846-647eb07f5be2?auto=format&fit=crop&w=1000&q=90',
+  phone: 'https://images.unsplash.com/photo-1592899677977-9c10ca588bbd?auto=format&fit=crop&w=1000&q=90', phone2: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=1000&q=90', phone3: 'https://images.unsplash.com/photo-1556656793-08538906a9f8?auto=format&fit=crop&w=1000&q=90',
+  laptop: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=1000&q=90', laptop2: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=1000&q=90', laptop3: 'https://images.unsplash.com/photo-1531297484001-80022131f5a1?auto=format&fit=crop&w=1000&q=90',
+  tv: 'https://images.unsplash.com/photo-1593784991095-a205069470b6?auto=format&fit=crop&w=1000&q=90', tv2: 'https://images.unsplash.com/photo-1461151304267-38535e780c79?auto=format&fit=crop&w=1000&q=90', camera: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1000&q=90', camera2: 'https://images.unsplash.com/photo-1606986628253-4b2c6c7f2f77?auto=format&fit=crop&w=1000&q=90',
+  audio: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1000&q=90', audio2: 'https://images.unsplash.com/photo-1484704849700-f032a568e944?auto=format&fit=crop&w=1000&q=90', speaker: 'https://images.unsplash.com/photo-1545454675-3531b543be5d?auto=format&fit=crop&w=1000&q=90', fridge: 'https://images.unsplash.com/photo-1584568694244-14fbdf83bd30?auto=format&fit=crop&w=1000&q=90', fridge2: 'https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?auto=format&fit=crop&w=1000&q=90', ac: 'https://images.unsplash.com/photo-1631545806609-7e0b6a58e2d1?auto=format&fit=crop&w=1000&q=90', printer: 'https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?auto=format&fit=crop&w=1000&q=90', router: 'https://images.unsplash.com/photo-1606904825846-647eb07f5be2?auto=format&fit=crop&w=1000&q=90',
 };
 const rows: [string,string,Category,string,string,number,number,number,number,number,string,string][] = [
   ['iPhone 15','Apple','Mobile','A3090','APL-IP15-128',65900,69900,79900,12,4,'1 Year',pics.phone], ['Galaxy S24','Samsung','Mobile','SM-S921B','SAM-S24-256',58900,62999,74999,8,3,'1 Year',pics.phone2], ['Pixel 8a','Google','Mobile','GKV4X','GOO-P8A-128',39900,42999,49999,3,4,'1 Year',pics.phone3], ['Nord CE 4','OnePlus','Mobile','CPH2613','OP-NCE4-256',21900,24999,27999,18,5,'1 Year',pics.phone2], ['Vivo V30','Vivo','Mobile','V2318','VIV-V30-256',28900,32999,36999,0,3,'1 Year',pics.phone3],
@@ -47,4 +35,4 @@ export const seedProducts: Product[] = rows.map((r, i) => ({ id: `p-${i+1}`, nam
 export const money = (value: number) => new Intl.NumberFormat('en-IN', { style:'currency', currency:'INR', maximumFractionDigits:0 }).format(value);
 export const statusOf = (p: Product) => p.quantity === 0 ? 'OUT OF STOCK' : p.quantity <= p.minStock ? 'LOW STOCK' : 'IN STOCK';
 export const readStore = <T,>(key: string, fallback: T): T => { try { const value = localStorage.getItem(key); return value ? JSON.parse(value) : fallback; } catch { return fallback; } };
-export const writeStore = (key: string, value: unknown) => localStorage.setItem(key, JSON.stringify(value));
+export const writeStore = (key: string, value: unknown) => { localStorage.setItem(key, JSON.stringify(value)); syncInventoryState(); };
