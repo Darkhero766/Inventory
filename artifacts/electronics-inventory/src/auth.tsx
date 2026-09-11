@@ -1,5 +1,6 @@
-import { FormEvent, ReactNode, useMemo, useState } from 'react';
-import { Check, Eye, EyeOff, KeyRound, LogIn, ShieldCheck, Trash2, UserPlus, Users, X } from 'lucide-react';
+import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
+import { Check, Chrome, Eye, EyeOff, KeyRound, LogIn, ShieldCheck, Trash2, UserPlus, Users, X } from 'lucide-react';
+import { supabase, supabaseConfigured } from './lib/supabase';
 
 const ADMIN_EMAIL = 'nightowlclub72@gmail.com';
 const USERS_KEY = 'keystone-auth-users-v1';
@@ -53,6 +54,48 @@ function LoginScreen({ onLogin }: { onLogin: (session: Session) => void }) {
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
+
+  useEffect(() => {
+    if (!supabase) return;
+    let active = true;
+    const finishGoogleSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      const email = data.session?.user.email?.trim().toLowerCase();
+      if (!email) return;
+      if (email !== ADMIN_EMAIL) {
+        await supabase.auth.signOut();
+        if (active) setError(`Google access is restricted to ${ADMIN_EMAIL}.`);
+        return;
+      }
+      const session: Session = { username: ADMIN_EMAIL, role: 'admin' };
+      write(SESSION_KEY, session);
+      if (active) onLogin(session);
+    };
+    void finishGoogleSession();
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      const email = session?.user.email?.trim().toLowerCase();
+      if (email === ADMIN_EMAIL) {
+        const next: Session = { username: ADMIN_EMAIL, role: 'admin' };
+        write(SESSION_KEY, next);
+        if (active) onLogin(next);
+      }
+    });
+    return () => { active = false; listener.subscription.unsubscribe(); };
+  }, [onLogin]);
+
+  const signInWithGoogle = async () => {
+    if (!supabaseConfigured || !supabase) {
+      setError('Google login needs Supabase configured in the deployment environment.');
+      return;
+    }
+    setError(''); setGoogleBusy(true);
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    });
+    if (oauthError) { setError(oauthError.message); setGoogleBusy(false); }
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault(); setError(''); setBusy(true);
@@ -112,6 +155,11 @@ function LoginScreen({ onLogin }: { onLogin: (session: Session) => void }) {
               <button disabled={busy} className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#11101f] text-sm font-black text-white shadow-lg shadow-slate-900/10 transition hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-50">{mode === 'setup' ? <ShieldCheck className="h-4 w-4" /> : <LogIn className="h-4 w-4" />}{busy ? 'Checking…' : mode === 'setup' ? 'Activate admin access' : 'Sign in'}</button>
             </form>
 
+            {mode === 'login' && <>
+              <div className="my-5 flex items-center gap-3"><div className="h-px flex-1 bg-slate-100" /><span className="text-[10px] font-black uppercase tracking-[.18em] text-slate-300">or</span><div className="h-px flex-1 bg-slate-100" /></div>
+              <button type="button" onClick={signInWithGoogle} disabled={googleBusy} className="flex h-12 w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white text-sm font-black text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"><Chrome className="h-4 w-4" />{googleBusy ? 'Opening Google…' : 'Continue with Google'}</button>
+              <p className="mt-2 text-center text-[10px] font-semibold text-slate-400">Google access is restricted to the workspace admin.</p>
+            </>}
             {mode === 'login' && <div className="mt-6 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-[11px] leading-5 text-slate-400">Staff accounts are created only by the signed-in admin. If you are the workspace owner and this browser has lost its admin setup, use the same browser/profile where the admin account was activated.</div>}
             {mode === 'setup' && <div className="mt-6 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-[11px] font-semibold leading-5 text-amber-800">First-run setup is intentionally limited to <span className="font-black">{ADMIN_EMAIL}</span>.</div>}
           </div>
@@ -153,5 +201,5 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const isAdmin = session?.role === 'admin';
   const sessionLabel = useMemo(() => session?.username ?? '', [session]);
   if (!session) return <LoginScreen onLogin={setSession} />;
-  return <div className="relative"><div className="fixed right-3 top-3 z-[90] flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/90 p-1.5 shadow-lg backdrop-blur"><span className="hidden max-w-[180px] truncate px-2 text-[10px] font-black text-slate-500 sm:block">{sessionLabel}</span>{isAdmin && <button onClick={() => setAdminOpen(true)} className="rounded-full bg-violet-600 px-3 py-2 text-[10px] font-black text-white transition hover:-translate-y-0.5 hover:bg-violet-700">Admin</button>}<button onClick={() => { localStorage.removeItem(SESSION_KEY); setSession(null); }} className="rounded-full bg-slate-100 px-3 py-2 text-[10px] font-black text-slate-600 transition hover:bg-slate-200">Log out</button></div>{children}{adminOpen && <AdminConsole onClose={() => setAdminOpen(false)} />}</div>;
+  return <div className="relative"><div className="fixed right-3 top-3 z-[90] flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/90 p-1.5 shadow-lg backdrop-blur"><span className="hidden max-w-[180px] truncate px-2 text-[10px] font-black text-slate-500 sm:block">{sessionLabel}</span>{isAdmin && <button onClick={() => setAdminOpen(true)} className="rounded-full bg-violet-600 px-3 py-2 text-[10px] font-black text-white transition hover:-translate-y-0.5 hover:bg-violet-700">Admin</button>}<button onClick={async () => { localStorage.removeItem(SESSION_KEY); if (supabase) await supabase.auth.signOut(); setSession(null); }} className="rounded-full bg-slate-100 px-3 py-2 text-[10px] font-black text-slate-600 transition hover:bg-slate-200">Log out</button></div>{children}{adminOpen && <AdminConsole onClose={() => setAdminOpen(false)} />}</div>;
 }
