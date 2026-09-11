@@ -1,7 +1,6 @@
 services:
   - type: web
     name: electronics-inventory
-    runtime: node
-    rootDir: .
-    buildCommand: corepack enable && corepack prepare pnpm@10.28.0 --activate && pnpm install --frozen-lockfile && pnpm --filter @workspace/electronics-inventory build
-    startCommand: pnpm --filter @workspace/electronics-inventory run serve -- --host 0.0.0.0
+    runtime: static
+    buildCommand: npm run build
+    staticPublishPath: artifacts/electronics-inventory/dist/public
