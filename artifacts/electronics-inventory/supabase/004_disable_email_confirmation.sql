@@ -1,0 +1,4 @@
+-- Disable email confirmation for this private inventory app.
+-- Run in Supabase SQL Editor.
+-- This config change is controlled from the Supabase Auth dashboard; keep this file as the project checklist.
+-- In Supabase Dashboard: Authentication -> Providers -> Email -> disable "Confirm email".
