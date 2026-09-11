@@ -1,6 +1,6 @@
 # Supabase + Google + relational inventory setup
 
-The app uses Supabase Auth for real multi-device sessions and Supabase Postgres for relational inventory data. The browser only uses the public/publishable key. Never put a service-role key in Vite environment variables.
+The app uses Supabase Auth for real multi-device sessions and Supabase Postgres for relational inventory data. The browser only uses the public/publishable key. Never put a service-role/secret key in Vite environment variables.
 
 ## 1. Run the database migrations
 
@@ -20,8 +20,10 @@ Add these to the Render Static Site:
 
 ```text
 VITE_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-VITE_SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_OR_PUBLISHABLE_KEY
+VITE_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLIC_PUBLISHABLE_KEY
 ```
+
+The app still accepts the older `VITE_SUPABASE_ANON_KEY` name for compatibility, but new deployments should use the publishable key.
 
 Redeploy after saving them.
 
@@ -103,9 +105,9 @@ The database has RLS enabled and all browser database operations are performed w
 Before using the live app:
 
 - Run all three SQL files.
-- Configure Render `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+- Configure Render `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
 - Disable **Confirm Email** in Supabase Email provider settings.
 - Enable Google provider and configure the Google callback URL.
 - Set Supabase Site URL and Redirect URLs to the live Render origin.
-- Never add a service-role key to GitHub, Render client environment variables, or the browser.
+- Never add a service-role/secret key to GitHub, Render client environment variables, or the browser.
 - Sign in once with the admin account before expecting cloud data to synchronize.
