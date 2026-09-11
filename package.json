@@ -6,10 +6,10 @@
   "packageManager": "pnpm@10.15.0",
   "engines": { "node": ">=20 <25" },
   "scripts": {
-    "build": "vite build --config artifacts/electronics-inventory/vite.config.ts",
-    "typecheck": "tsc -p artifacts/electronics-inventory/tsconfig.json --noEmit",
-    "dev": "vite --config artifacts/electronics-inventory/vite.config.ts --host 0.0.0.0",
-    "preview": "vite preview --config artifacts/electronics-inventory/vite.config.ts --host 0.0.0.0"
+    "build": "corepack pnpm install --no-frozen-lockfile && corepack pnpm exec vite build --config artifacts/electronics-inventory/vite.config.ts",
+    "typecheck": "corepack pnpm exec tsc -p artifacts/electronics-inventory/tsconfig.json --noEmit",
+    "dev": "corepack pnpm exec vite --config artifacts/electronics-inventory/vite.config.ts --host 0.0.0.0",
+    "preview": "corepack pnpm exec vite preview --config artifacts/electronics-inventory/vite.config.ts --host 0.0.0.0"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
