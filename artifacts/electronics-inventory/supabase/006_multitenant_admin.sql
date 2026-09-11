@@ -1,7 +1,6 @@
 -- Multi-tenant hardening. Run after 003_complete_backend.sql and 005_customer_sales_rls.sql.
--- This migration makes formerly-global SKU/invoice/client IDs tenant-scoped and adds the owner admin dashboard RPC.
+-- Makes formerly-global SKU/invoice/client IDs tenant-scoped and adds the owner admin dashboard RPC.
 
--- Remove legacy global uniqueness that would block two shops from using the same SKU/invoice number.
 alter table public.products drop constraint if exists products_sku_key;
 alter table public.sales drop constraint if exists sales_invoice_number_key;
 drop index if exists public.products_client_id_uidx;
@@ -20,11 +19,9 @@ create unique index if not exists idx_emi_payments_owner_client_id on public.emi
 create unique index if not exists idx_products_owner_sku_v2 on public.products(owner_id,sku) where owner_id is not null;
 create unique index if not exists idx_sales_owner_invoice_v2 on public.sales(owner_id,invoice_number) where owner_id is not null;
 
--- workspace_key used to be the primary key, which made the default workspace global. Ownership is now part of the key.
 alter table public.inventory_state drop constraint if exists inventory_state_pkey;
 create unique index if not exists idx_inventory_state_owner_workspace_v2 on public.inventory_state(owner_id,workspace_key) where owner_id is not null;
 
--- Replace snapshot sync with an owner-scoped version. Existing legacy rows with NULL owner_id remain isolated from new accounts.
 create or replace function public.sync_inventory_snapshot(p_state jsonb)
 returns jsonb language plpgsql security invoker set search_path=public as $$
 declare item jsonb; line jsonb; v_customer_id uuid; v_sale_id uuid; v_emi_id uuid; v_product_id uuid; v_owner uuid:=auth.uid();
@@ -49,7 +46,9 @@ begin
   delete from sale_items where sale_id=v_sale_id and owner_id=v_owner;
   for line in select * from jsonb_array_elements(coalesce(item->'items','[]'::jsonb)) loop
    select id into v_product_id from products where owner_id=v_owner and client_id=line->>'productId' limit 1; if v_product_id is null then continue; end if;
-   insert into sale_items(owner_id,client_id,sale_id,product_id,quantity,unit_price,discount,final_price) values(v_owner,(item->>'id')||':'||coalesce(line->>'productId','item'),v_sale_id,greatest(1,coalesce((line->>'quantity')::integer,1)),coalesce((line->>'price')::numeric,0),coalesce((line->>'discount')::numeric,0),greatest(0,coalesce((line->>'price')::numeric,0)-(coalesce((line->>'discount')::numeric,0)/greatest(1,coalesce((line->>'quantity')::integer,1))))) on conflict (owner_id,client_id) do update set sale_id=excluded.sale_id,product_id=excluded.product_id,quantity=excluded.quantity,unit_price=excluded.unit_price,discount=excluded.discount,final_price=excluded.final_price;
+   insert into sale_items(owner_id,client_id,sale_id,product_id,quantity,unit_price,discount,final_price)
+   values(v_owner,(item->>'id')||':'||coalesce(line->>'productId','item'),v_sale_id,v_product_id,greatest(1,coalesce((line->>'quantity')::integer,1)),coalesce((line->>'price')::numeric,0),coalesce((line->>'discount')::numeric,0),greatest(0,(coalesce((line->>'price')::numeric,0)*greatest(1,coalesce((line->>'quantity')::integer,1)))-coalesce((line->>'discount')::numeric,0)))
+   on conflict (owner_id,client_id) do update set sale_id=excluded.sale_id,product_id=excluded.product_id,quantity=excluded.quantity,unit_price=excluded.unit_price,discount=excluded.discount,final_price=excluded.final_price;
   end loop;
  end loop;
  for item in select * from jsonb_array_elements(coalesce(p_state->'keystone-emi-plans','[]'::jsonb)) loop
@@ -67,7 +66,6 @@ begin
 end; $$;
 grant execute on function public.sync_inventory_snapshot(jsonb) to authenticated;
 
--- Owner-only platform dashboard. It exposes aggregate business metrics, not credentials or secrets.
 create or replace function public.admin_get_workspace_overview()
 returns jsonb language plpgsql security definer set search_path=public as $$
 declare result jsonb;
