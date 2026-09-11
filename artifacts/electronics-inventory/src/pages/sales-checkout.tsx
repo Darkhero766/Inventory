@@ -1,0 +1,87 @@
+import { useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, Check, Minus, Plus, ReceiptText, Search, Trash2, UserRound } from 'lucide-react';
+import { Link, useLocation } from 'wouter';
+import { Customer, Product, Sale, EmiPlan, EmiPayment, readStore, seedProducts, writeStore } from '@/lib/inventory';
+import { supabase } from '@/lib/supabase';
+import { hydrateInventoryState, resetCloudHydration } from '@/lib/cloud-sync';
+import { ProductImage } from '@/components/product-card';
+
+const money = (v:number) => new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',minimumFractionDigits:0,maximumFractionDigits:2}).format(v);
+const input='h-11 w-full rounded-xl border border-[hsl(var(--input))] bg-[hsl(var(--card))] px-3 text-sm outline-none focus:border-[hsl(var(--primary))] focus:ring-2 focus:ring-[hsl(var(--primary)/.14)]';
+
+export default function SalesCheckoutPage(){
+  const [,setLocation]=useLocation();
+  const [products,setProducts]=useState<Product[]>(()=>readStore('keystone-products',seedProducts));
+  const [customers,setCustomers]=useState<Customer[]>(()=>readStore('keystone-customers',[]));
+  const [cart,setCart]=useState<{productId:string;quantity:number}[]>(()=>readStore('keystone-sale-draft',[]));
+  const [customerId,setCustomerId]=useState(''); const [customerName,setCustomerName]=useState(''); const [customerPhone,setCustomerPhone]=useState('');
+  const [discountType,setDiscountType]=useState<'fixed'|'percent'>('fixed'); const [discountValue,setDiscountValue]=useState('');
+  const [payment,setPayment]=useState('Cash'); const [cash,setCash]=useState(''); const [upi,setUpi]=useState(''); const [card,setCard]=useState('');
+  const [downPayment,setDownPayment]=useState(''); const [months,setMonths]=useState('6'); const [firstDue,setFirstDue]=useState(new Date().toISOString().slice(0,10));
+  const [search,setSearch]=useState(''); const [busy,setBusy]=useState(false); const [error,setError]=useState(''); const [invoice,setInvoice]=useState<Sale|null>(null);
+
+  useEffect(()=>{void hydrateInventoryState().then(()=>{setProducts(readStore('keystone-products',seedProducts));setCustomers(readStore('keystone-customers',[]));setCart(readStore('keystone-sale-draft',[]));});},[]);
+  useEffect(()=>{writeStore('keystone-sale-draft',cart);},[cart]);
+  const items=useMemo(()=>cart.map(i=>({...i,product:products.find(p=>p.id===i.productId)!})).filter(i=>i.product),[cart,products]);
+  const subtotal=items.reduce((s,i)=>s+i.product.sellingPrice*i.quantity,0);
+  const raw=discountType==='percent'?subtotal*Math.max(0,Math.min(100,Number(discountValue)||0))/100:Math.max(0,Number(discountValue)||0);
+  const discount=Math.min(subtotal,raw); const total=Math.max(0,subtotal-discount);
+  const cost=items.reduce((s,i)=>s+i.product.purchasePrice*i.quantity,0); const profit=total-cost; const margin=total?profit/total*100:0;
+  const financed=Math.max(0,total-(Number(downPayment)||0)); const emi=Number(months)>0?financed/Number(months):0;
+  const received=payment==='Mixed Payment'?Number(cash||0)+Number(upi||0)+Number(card||0):payment==='EMI'?Number(downPayment)||0:total;
+  const results=products.filter(p=>p.quantity>0&&`${p.name} ${p.brand} ${p.sku} ${p.model}`.toLowerCase().includes(search.toLowerCase())).slice(0,8);
+  const add=(p:Product)=>setCart(prev=>prev.some(i=>i.productId===p.id)?prev.map(i=>i.productId===p.id?{...i,quantity:Math.min(p.quantity,i.quantity+1)}:i):[...prev,{productId:p.id,quantity:1}]);
+  const remove=(id:string)=>setCart(prev=>prev.filter(i=>i.productId!==id));
+  const changeQty=(id:string,d:number)=>setCart(prev=>prev.map(i=>{if(i.productId!==id)return i;const p=products.find(x=>x.id===id);return {...i,quantity:Math.max(1,Math.min(p?.quantity??1,i.quantity+d))};}));
+  const selectCustomer=(c:Customer)=>{setCustomerId(c.id);setCustomerName(c.name);setCustomerPhone(c.phone);};
+  const finish=async()=>{
+    setError(''); if(!items.length){setError('Add at least one product.');return;}
+    if(payment!=='EMI'&&received+0.001<total){setError(`Payment received must be at least ${money(total)}.`);return;}
+    if(payment==='EMI'&&(Number(downPayment)<0||Number(downPayment)>total||Number(months)<1)){setError('Check the EMI down payment and number of months.');return;}
+    if(payment==='EMI'&&!customerId&&!customerPhone.trim()){setError('EMI sales require a customer.');return;}
+    if(items.some(i=>i.quantity>i.product.quantity)){setError('One or more products no longer have enough stock.');return;}
+    setBusy(true);
+    try{
+      let cid=customerId;
+      if(!cid&&customerName.trim()&&customerPhone.trim()){
+        const existing=customers.find(c=>c.phone.trim()===customerPhone.trim());
+        if(existing) cid=existing.id; else {cid=`cus-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;const next={id:cid,name:customerName.trim(),phone:customerPhone.trim(),createdAt:new Date().toISOString()} as Customer;const all=[next,...customers];writeStore('keystone-customers',all);setCustomers(all);}
+      }
+      const saleId=`sale-${Date.now()}-${Math.random().toString(36).slice(2,7)}`; const date=new Date().toISOString(); const invoiceNo=`INV-${new Date().getFullYear()}-${String(Date.now()).slice(-7)}`;
+      const sale:Sale={id:saleId,date,invoice:invoiceNo,customerId:cid||undefined,customerName:customerName.trim()||customers.find(c=>c.id===cid)?.name,items:items.map(i=>({productId:i.productId,productName:i.product.name,quantity:i.quantity,price:i.product.sellingPrice,discount:discount*(i.product.sellingPrice*i.quantity/Math.max(subtotal,1)),serialNumber:i.product.serialNumber,imei:i.product.imei})),subtotal,discount,total,payment,discountType,discountValue:Number(discountValue)||0,purchaseCost:cost,profit,status:'COMPLETED'};
+      const nextProducts=products.map(p=>{const line=items.find(i=>i.productId===p.id);return line?{...p,quantity:p.quantity-line.quantity}:p;});
+      writeStore('keystone-sales',[sale,...readStore<Sale[]>('keystone-sales',[])]); writeStore('keystone-products',nextProducts); setProducts(nextProducts);
+      if(payment==='EMI'&&cid){
+        const n=Math.max(1,Math.floor(Number(months))); const dp=Math.max(0,Number(downPayment)||0); const financedAmount=Math.max(0,total-dp); const emiAmount=n?Number((financedAmount/n).toFixed(2)):0; const planId=`emi-${Date.now()}-${Math.random().toString(36).slice(2,6)}`; const start=new Date(`${firstDue}T00:00:00`); const payments:EmiPayment[]=[];
+        for(let i=1;i<=n;i++){const due=new Date(start);due.setMonth(due.getMonth()+i-1);const amount=i===n?Number((financedAmount-emiAmount*(n-1)).toFixed(2)):emiAmount;payments.push({id:`emip-${Date.now()}-${i}-${Math.random().toString(36).slice(2,5)}`,emiPlanId:planId,installmentNumber:i,dueDate:due.toISOString(),amount,status:'UPCOMING'});}
+        const end=payments[n-1]?.dueDate||start.toISOString();const plan:EmiPlan={id:planId,saleId,customerId:cid,totalAmount:total,downPayment:dp,financedAmount,emiAmount,installments:n,paidInstallments:0,outstandingAmount:financedAmount,nextDueDate:payments[0]?.dueDate||null,endDate:end,frequency:'MONTHLY',status:financedAmount>0?'ACTIVE':'PAID'};
+        writeStore('keystone-emi-plans',[plan,...readStore<EmiPlan[]>('keystone-emi-plans',[])]); writeStore('keystone-emi-payments',[...payments,...readStore<EmiPayment[]>('keystone-emi-payments',[])]);
+      }
+      setInvoice(sale);setCart([]);writeStore('keystone-sale-draft',[]);resetCloudHydration();
+    }catch(e){setError(e instanceof Error?e.message:'Sale could not be completed.');}finally{setBusy(false);}
+  };
+  return <div className="fade-up pb-28 mx-auto max-w-6xl">
+    <div className="mb-5 flex items-center justify-between gap-3"><Link href="/sales" className="inline-flex items-center gap-2 text-xs font-semibold text-[hsl(var(--muted-foreground))]"><ArrowLeft className="h-4 w-4"/>Back to products</Link><span className="rounded-full bg-[hsl(var(--accent))] px-3 py-1.5 text-[10px] font-bold">Checkout · {items.reduce((s,i)=>s+i.quantity,0)} items</span></div>
+    <div className="grid gap-5 lg:grid-cols-[1.15fr_.85fr]">
+      <section className="min-w-0 rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--muted-foreground))]">Step 1 · cart</p><h1 className="mt-1 text-2xl font-extrabold tracking-[-.04em]">Review sale</h1></div><div className="w-full sm:w-72"><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[hsl(var(--muted-foreground))]"/><input className={`${input} pl-9`} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Add another product"/></div></div></div>
+        {search&&<div className="mt-2 space-y-1 rounded-2xl border border-[hsl(var(--border))] p-2">{results.map(p=><button key={p.id} onClick={()=>add(p)} className="flex w-full items-center gap-3 rounded-xl p-2 text-left hover:bg-[hsl(var(--muted))]"><ProductImage product={p} className="h-10 w-10 rounded-lg"/><span className="min-w-0 flex-1"><strong className="block truncate text-xs">{p.name}</strong><span className="text-[10px] text-[hsl(var(--muted-foreground))]">{money(p.sellingPrice)} · {p.quantity} stock</span></span><Plus className="h-4 w-4"/></button>)}</div>}
+        <div className="mt-5 space-y-2">{items.length?items.map(i=><div key={i.productId} className="flex items-center gap-3 rounded-2xl border border-[hsl(var(--border))] p-3"><ProductImage product={i.product} className="h-14 w-14 shrink-0 rounded-xl"/><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{i.product.name}</p><p className="text-[10px] text-[hsl(var(--muted-foreground))]">{i.product.brand} · {money(i.product.sellingPrice)} each</p><div className="mt-2 flex w-fit items-center gap-2 rounded-xl bg-[hsl(var(--muted))] p-1"><button onClick={()=>changeQty(i.productId,-1)} className="rounded-lg p-1.5"><Minus className="h-3 w-3"/></button><span className="w-5 text-center text-xs font-bold">{i.quantity}</span><button onClick={()=>changeQty(i.productId,1)} className="rounded-lg p-1.5"><Plus className="h-3 w-3"/></button></div></div><div className="text-right"><p className="text-sm font-bold">{money(i.product.sellingPrice*i.quantity)}</p><button onClick={()=>remove(i.productId)} className="mt-1 text-[10px] font-semibold text-red-500">Remove</button></div></div>):<div className="flex min-h-56 items-center justify-center rounded-2xl border border-dashed border-[hsl(var(--border))] text-sm text-[hsl(var(--muted-foreground))]">No products selected.</div>}</div>
+      </section>
+      <aside className="min-w-0 rounded-3xl bg-[hsl(var(--primary))] p-4 text-[hsl(var(--primary-foreground))] shadow-xl sm:p-6 lg:sticky lg:top-20 lg:h-fit">
+        <p className="font-mono text-[10px] uppercase tracking-[.18em] opacity-50">Steps 2–6</p><h2 className="mt-1 text-xl font-bold">Checkout</h2>
+        <div className="mt-5 space-y-4">
+          <div><label className="text-[10px] font-semibold opacity-60">Customer</label><div className="mt-2 flex items-center gap-2"><UserRound className="h-4 w-4 opacity-50"/><select value={customerId} onChange={e=>{const c=customers.find(x=>x.id===e.target.value);if(c)selectCustomer(c);else setCustomerId('')}} className="h-10 min-w-0 flex-1 rounded-xl bg-white/10 px-3 text-xs outline-none"><option value="">Walk-in / new customer</option>{customers.map(c=><option key={c.id} value={c.id}>{c.name} · {c.phone}</option>)}</select></div>{!customerId&&<div className="mt-2 grid grid-cols-2 gap-2"><input className="h-10 min-w-0 rounded-xl bg-white/10 px-3 text-xs text-white outline-none placeholder:text-white/40" value={customerName} onChange={e=>setCustomerName(e.target.value)} placeholder="Name"/><input className="h-10 min-w-0 rounded-xl bg-white/10 px-3 text-xs text-white outline-none placeholder:text-white/40" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)} placeholder="Mobile"/></div>}</div>
+          <div><label className="text-[10px] font-semibold opacity-60">Discount</label><div className="mt-2 flex gap-2"><div className="flex rounded-xl bg-white/10 p-1"><button onClick={()=>setDiscountType('fixed')} className={`rounded-lg px-3 py-1.5 text-xs font-bold ${discountType==='fixed'?'bg-white/20':''}`}>₹</button><button onClick={()=>setDiscountType('percent')} className={`rounded-lg px-3 py-1.5 text-xs font-bold ${discountType==='percent'?'bg-white/20':''}`}>%</button></div><input type="number" min="0" max={discountType==='percent'?100:subtotal} value={discountValue} onChange={e=>setDiscountValue(e.target.value)} placeholder="Discount" className="h-10 min-w-0 flex-1 rounded-xl bg-white/10 px-3 text-right text-xs text-white outline-none placeholder:text-white/40"/></div>{discount>0&&<p className="mt-1 text-[10px] font-semibold text-emerald-200">You saved {money(discount)}</p>}</div>
+          <div><label className="text-[10px] font-semibold opacity-60">Payment</label><div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">{['Cash','UPI','Card','Bank Transfer','EMI','Mixed Payment'].map(m=><button key={m} onClick={()=>setPayment(m)} className={`rounded-xl px-2 py-2.5 text-[10px] font-bold ${payment===m?'bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]':'bg-white/10'}`}>{m}</button>)}</div></div>
+          {payment==='Mixed Payment'&&<div className="grid grid-cols-3 gap-2"><input type="number" className="h-9 rounded-lg bg-white/10 px-2 text-xs text-white outline-none" value={cash} onChange={e=>setCash(e.target.value)} placeholder="Cash"/><input type="number" className="h-9 rounded-lg bg-white/10 px-2 text-xs text-white outline-none" value={upi} onChange={e=>setUpi(e.target.value)} placeholder="UPI"/><input type="number" className="h-9 rounded-lg bg-white/10 px-2 text-xs text-white outline-none" value={card} onChange={e=>setCard(e.target.value)} placeholder="Card"/></div>}
+          {payment==='EMI'&&<div className="grid gap-2 sm:grid-cols-3"><input type="number" min="0" max={total} className="h-10 rounded-xl bg-white/10 px-3 text-xs text-white outline-none" value={downPayment} onChange={e=>setDownPayment(e.target.value)} placeholder="Down payment"/><input type="number" min="1" className="h-10 rounded-xl bg-white/10 px-3 text-xs text-white outline-none" value={months} onChange={e=>setMonths(e.target.value)} placeholder="Months"/><input type="date" className="h-10 rounded-xl bg-white/10 px-3 text-xs text-white outline-none" value={firstDue} onChange={e=>setFirstDue(e.target.value)}/><p className="text-[10px] sm:col-span-3">Finance {money(financed)} · EMI {money(emi)} / month</p></div>}
+          <div className="border-t border-white/10 pt-4"><div className="flex justify-between text-xs opacity-60"><span>Subtotal</span><span>{money(subtotal)}</span></div><div className="mt-1 flex justify-between text-xs opacity-70"><span>Discount</span><span>-{money(discount)}</span></div><div className="mt-3 flex justify-between"><span className="text-xs opacity-60">Final</span><strong className="text-3xl tracking-[-.05em]">{money(total)}</strong></div><div className="mt-2 grid grid-cols-3 gap-2 text-[9px] opacity-65"><span>Cost {money(cost)}</span><span>Profit {money(profit)}</span><span>Margin {margin.toFixed(1)}%</span></div></div>
+          {error&&<div className="rounded-xl bg-red-500/15 px-3 py-2 text-[10px] font-bold text-red-100">{error}</div>}
+          <button disabled={busy||!items.length} onClick={finish} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[hsl(var(--secondary))] text-sm font-black text-[hsl(var(--secondary-foreground))] disabled:opacity-40"><ReceiptText className="h-4 w-4"/>{busy?'Completing…':'Complete sale'}</button>
+        </div>
+      </aside>
+    </div>
+    {invoice&&<div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4"><div className="w-full max-w-md rounded-3xl bg-[hsl(var(--card))] p-6 shadow-2xl"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600"><Check className="h-5 w-5"/></span><h2 className="mt-4 text-xl font-bold">Sale completed</h2><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{invoice.invoice}</p><div className="mt-5 space-y-2 rounded-2xl bg-[hsl(var(--muted)/.55)] p-4 text-sm"><div className="flex justify-between"><span>Final amount</span><strong>{money(invoice.total)}</strong></div><div className="flex justify-between"><span>Discount</span><strong>-{money(invoice.discount)}</strong></div><div className="flex justify-between"><span>Profit</span><strong>{money(invoice.profit||0)}</strong></div><div className="flex justify-between"><span>Customer</span><strong>{invoice.customerName||'Walk-in'}</strong></div></div><div className="mt-5 flex gap-2"><Link href="/sales" className="flex-1 rounded-xl bg-[hsl(var(--primary))] px-4 py-3 text-center text-xs font-bold text-[hsl(var(--primary-foreground))]">New sale</Link>{invoice.customerId&&<Link href={`/customers/${invoice.customerId}`} className="flex-1 rounded-xl border border-[hsl(var(--border))] px-4 py-3 text-center text-xs font-bold">View customer</Link>}</div></div></div>}
+  </div>;
+}
