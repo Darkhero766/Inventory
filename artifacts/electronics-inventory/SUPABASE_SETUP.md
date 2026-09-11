@@ -35,7 +35,7 @@ In Supabase go to:
 
 Turn **Confirm Email** / **Email Confirmations** **OFF**.
 
-Supabase documents that when Confirm Email is disabled, `signUp()` can return a session immediately instead of requiring the user to confirm an email first. urlSupabase Auth configuration docshttps://supabase.com/docs/guides/auth/general-configuration
+When Confirm Email is disabled, Supabase can return a session immediately from `signUp()` instead of requiring the user to confirm the email first.
 
 The app's Create Account flow is already written for immediate sign-in and no longer tells users to check their email.
 
