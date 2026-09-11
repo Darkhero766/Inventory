@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Check, Minus, Plus, ReceiptText, Search, Trash2, UserRound } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { Customer, Product, Sale, EmiPlan, EmiPayment, readStore, seedProducts, writeStore } from '@/lib/inventory';
-import { supabase } from '@/lib/supabase';
 import { hydrateInventoryState, resetCloudHydration } from '@/lib/cloud-sync';
 import { ProductImage } from '@/components/product-card';
 
