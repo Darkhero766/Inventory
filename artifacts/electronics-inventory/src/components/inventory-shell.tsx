@@ -1,6 +1,6 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { BarChart3, Boxes, ClipboardList, Home, Menu, MoreHorizontal, ShoppingCart, Sparkles, X, Users } from 'lucide-react';
+import { BarChart3, Boxes, ClipboardList, Home, Menu, ShoppingCart, Sparkles, X, Users, LogOut } from 'lucide-react';
 
 const nav = [
   { href: '/', label: 'Home', icon: Home },
@@ -10,9 +10,16 @@ const nav = [
   { href: '/customers', label: 'Customers', icon: Users },
 ];
 
+type AccountSession = { username:string; role:'admin'|'staff'; name?:string; email?:string; avatarUrl?:string };
+const SESSION_KEY='keystone-auth-session-v1';
+const readSession=():AccountSession|null=>{try{const raw=localStorage.getItem(SESSION_KEY);return raw?JSON.parse(raw):null;}catch{return null;}};
+
 export function InventoryShell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [open, setOpen] = useState(false);
+  const [account, setAccount] = useState<AccountSession|null>(()=>readSession());
+  const [accountOpen,setAccountOpen]=useState(false);
+  useEffect(()=>{const sync=()=>setAccount(readSession());window.addEventListener('storage',sync);const t=window.setInterval(sync,1000);return()=>{window.removeEventListener('storage',sync);window.clearInterval(t);};},[]);
   const active = (href: string) => href === '/' ? location === '/' : location.startsWith(href);
   const close = () => setOpen(false);
 
@@ -24,7 +31,7 @@ export function InventoryShell({ children }: { children: ReactNode }) {
       <div className="mt-auto rounded-[20px] border border-[hsl(var(--sidebar-border))] bg-[linear-gradient(145deg,hsl(var(--sidebar-accent)),hsl(var(--card)))] p-4"><p className="text-xs font-bold">A clear shelf, every day.</p><p className="mt-1 text-[11px] leading-relaxed text-[hsl(var(--muted-foreground))]">Products, customers, purchases and sales in one calm workspace.</p><Link href="/inventory" onClick={close} className="mt-4 flex items-center justify-center rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card)/.75)] px-3 py-2.5 text-xs font-bold transition hover:-translate-y-0.5 hover:bg-[hsl(var(--card))]">Open inventory</Link></div>
     </aside>
     {open&&<button className="fixed inset-0 z-30 bg-[hsl(224_26%_16%/.28)] backdrop-blur-[2px] md:hidden" onClick={close} aria-label="Close navigation"/>}
-    <div className="flex min-w-0 flex-1 flex-col"><header className="sticky top-0 z-20 flex h-[68px] items-center justify-between border-b border-[hsl(var(--border)/.8)] bg-[hsl(var(--background)/.84)] px-4 backdrop-blur-xl md:px-9"><button className="flex h-10 w-10 items-center justify-center rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card)/.7)] shadow-sm md:hidden" onClick={()=>setOpen(true)} aria-label="Open menu"><Menu className="h-5 w-5"/></button><div className="hidden md:block"><p className="font-mono text-[9px] font-bold uppercase tracking-[.18em] text-[hsl(var(--muted-foreground))]">Electronics stock desk</p><p className="mt-1 text-xs font-semibold">Inventory workspace</p></div><div className="ml-auto flex items-center gap-2.5"><div className="hidden text-right sm:block"><p className="text-xs font-bold">Aarav Mehta</p><p className="font-mono text-[10px] text-[hsl(var(--muted-foreground))]">Owner / Admin</p></div><div className="flex h-9 w-9 items-center justify-center rounded-full bg-[hsl(var(--accent))] text-xs font-extrabold ring-4 ring-[hsl(var(--accent)/.45)]">AM</div></div></header><main className="mx-auto w-full max-w-[1500px] flex-1 px-3 pb-24 pt-4 sm:px-5 md:px-9 md:pb-10 md:pt-8">{children}</main></div>
+    <div className="flex min-w-0 flex-1 flex-col"><header className="sticky top-0 z-20 flex h-[68px] items-center justify-between border-b border-[hsl(var(--border)/.8)] bg-[hsl(var(--background)/.84)] px-4 backdrop-blur-xl md:px-9"><button className="flex h-10 w-10 items-center justify-center rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card)/.7)] shadow-sm md:hidden" onClick={()=>setOpen(true)} aria-label="Open menu"><Menu className="h-5 w-5"/></button><div className="hidden md:block"><p className="font-mono text-[9px] font-bold uppercase tracking-[.18em] text-[hsl(var(--muted-foreground))]">Electronics stock desk</p><p className="mt-1 text-xs font-semibold">Inventory workspace</p></div><button onClick={()=>setAccountOpen(v=>!v)} className="ml-auto flex items-center gap-2.5 rounded-full p-1.5 transition hover:bg-[hsl(var(--muted))]" aria-label="Open account menu"><div className="hidden text-right sm:block"><p className="text-xs font-bold">{account?.name || 'Account'}</p><p className="font-mono text-[10px] text-[hsl(var(--muted-foreground))]">{account?.role==='admin'?'Owner / Admin':'Staff'}</p></div><div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-[hsl(var(--accent))] text-xs font-extrabold ring-4 ring-[hsl(var(--accent)/.45)]">{account?.avatarUrl?<img src={account.avatarUrl} alt="" className="h-full w-full object-cover"/>:(account?.name||account?.email||'AC').slice(0,2).toUpperCase()}</div></button>{accountOpen&&<div className="absolute right-4 top-[58px] w-[260px] overflow-hidden rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-2 shadow-2xl"><div className="rounded-xl bg-[hsl(var(--muted))] p-3"><p className="text-sm font-black">{account?.name||'Account'}</p><p className="mt-0.5 truncate text-xs text-[hsl(var(--muted-foreground))]">{account?.email||account?.username}</p></div><button onClick={()=>setAccountOpen(false)} className="mt-2 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-bold hover:bg-[hsl(var(--muted))]">Account profile</button><button onClick={()=>{localStorage.removeItem(SESSION_KEY);window.location.reload();}} className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-bold text-red-600 hover:bg-red-50"><LogOut className="h-4 w-4"/>Log out</button></div>}</header><main className="mx-auto w-full max-w-[1500px] flex-1 px-3 pb-24 pt-4 sm:px-5 md:px-9 md:pb-10 md:pt-8">{children}</main></div>
     <nav className="mobile-nav-shadow fixed bottom-0 left-0 right-0 z-30 flex h-[76px] items-center justify-around border-t border-[hsl(var(--border)/.9)] bg-[hsl(var(--card)/.94)] px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-2xl md:hidden">{nav.map(({href,label,icon:Icon})=><Link href={href} key={label} className={`flex min-w-[58px] flex-col items-center gap-1 rounded-2xl px-1.5 py-2 text-[9px] font-bold transition-all ${active(href)?'bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] shadow-[0_5px_16px_hsl(var(--accent)/.55)]':'text-[hsl(var(--muted-foreground))]'}`}><Icon className="h-[17px] w-[17px]"/>{label}</Link>)}</nav>
   </div>;
 }
