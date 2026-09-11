@@ -8,6 +8,10 @@ const original=src;
 if(!src.includes("./pages/admin-page")) src=src.replace("import NotFound from '@/pages/not-found';", "import NotFound from '@/pages/not-found';\nimport AdminPage from './pages/admin-page';\nimport SalesCheckoutPage from './pages/sales-checkout';");
 
 src=src.replace(
+"function makeInventory() {\n  const [products, setProducts] = useState<Product[]>(() => readStore('keystone-products', seedProducts));",
+"function makeInventory() {\n  const initialProducts = (() => { try { const s=JSON.parse(localStorage.getItem('keystone-auth-session-v1')||'null'); return s?.role==='admin' ? seedProducts : []; } catch { return []; } })();\n  const [products, setProducts] = useState<Product[]>(() => readStore('keystone-products', initialProducts));")
+
+src=src.replace(
 "  const addSale = (sale: Omit<Sale, 'id'|'date'>) => {\n    if (sale.items.some(item => (products.find(p => p.id === item.productId)?.quantity ?? 0) < item.quantity)) return false;\n    const purchaseCost = sale.items.reduce((sum, item) => sum + (products.find(p => p.id === item.productId)?.purchasePrice ?? 0) * item.quantity, 0);\n    const profit = sale.total - purchaseCost;\n    setSales(prev => [{ ...sale, id:`sale-${Date.now()}`, date:new Date().toISOString(), purchaseCost, profit, status:'COMPLETED' }, ...prev]);\n    sale.items.forEach(item => adjustStock(item.productId, -item.quantity, 'SALE', `POS sale · ${sale.payment}`));\n    return true;\n  };",
 "  const addSale = (sale: Omit<Sale, 'id'|'date'>) => {\n    if (sale.items.some(item => (products.find(p => p.id === item.productId)?.quantity ?? 0) < item.quantity)) return false;\n    const purchaseCost = sale.items.reduce((sum, item) => sum + (products.find(p => p.id === item.productId)?.purchasePrice ?? 0) * item.quantity, 0);\n    const profit = sale.total - purchaseCost;\n    const created:Sale = { ...sale, id:`sale-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date:new Date().toISOString(), purchaseCost, profit, status:'COMPLETED' };\n    setSales(prev => [created, ...prev]);\n    sale.items.forEach(item => adjustStock(item.productId, -item.quantity, 'SALE', `POS sale · ${sale.payment}`));\n    return created;\n  };")
 
@@ -47,4 +51,11 @@ if(!shell.includes('Admin console')){
     "{session?.role==='admin'&&<Link href=\"/admin\" onClick={()=>setAccountOpen(false)} className=\"mt-2 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-bold text-violet-700 hover:bg-violet-50\"><ShieldCheck className=\"h-4 w-4\"/>Admin console</Link>}<button onClick={logout} className=\"mt-2 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-bold text-red-600 hover:bg-red-50\">");
   fs.writeFileSync(shellPath,shell);
 }
-console.log('Prepared existing App.tsx and shell for dedicated checkout, tenant-safe sale IDs, dynamic account name, and admin console.');
+
+const authPath=path.resolve('artifacts/electronics-inventory/src/auth.tsx');
+let auth=fs.readFileSync(authPath,'utf8');
+auth=auth.replace("import { hydrateInventoryState } from './lib/cloud-sync';", "import { hydrateInventoryState, resetCloudHydration } from './lib/cloud-sync';");
+auth=auth.replace("const user=userData.user;const metadata=", "const user=userData.user;if(!user?.id)throw new Error('Authenticated user is missing an ID.');prepareTenant(user.id);resetCloudHydration();const metadata=");
+auth=auth.replace("import { hydrateInventoryState, resetCloudHydration } from './lib/cloud-sync';", "import { hydrateInventoryState, resetCloudHydration } from './lib/cloud-sync';\nimport { prepareTenant } from './lib/tenant';");
+fs.writeFileSync(authPath,auth);
+console.log('Prepared existing app for tenant-isolated local state, dedicated checkout, correct EMI sale IDs, dynamic account names, and admin console.');
