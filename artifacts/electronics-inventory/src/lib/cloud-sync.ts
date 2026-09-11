@@ -25,7 +25,7 @@ export async function hydrateInventoryState() {
     if (!(await ensureSession())) return false;
     const { data, error } = await supabase.from('inventory_state').select('state').eq('workspace_key', 'default').maybeSingle();
     if (error) { console.warn('[cloud] state read failed:', error.message); return false; }
-    if (!data?.state) return false;
+    if (!data?.state) { syncInventoryState(); return false; }
     hydrating = true;
     try {
       const state = data.state as Record<string, unknown>;
