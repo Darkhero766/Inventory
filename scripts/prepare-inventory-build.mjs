@@ -32,6 +32,19 @@ src=src.replace(
 "<Route path=\"/sales\" component={SalesPage}/>",
 "<Route path=\"/sales\" component={SalesPage}/><Route path=\"/sales/checkout\" component={SalesCheckoutPage}/><Route path=\"/admin\" component={AdminPage}/>")
 
-if(src===original) throw new Error('prepare-inventory-build.mjs made no changes; source markers may have drifted.');
+if(src===original) throw new Error('prepare-inventory-build.mjs made no App.tsx changes; source markers may have drifted.');
 fs.writeFileSync(appPath,src);
-console.log('Prepared existing App.tsx for dedicated checkout, tenant-safe sale IDs, dynamic account name, and admin route.');
+
+const shellPath=path.resolve('artifacts/electronics-inventory/src/components/inventory-shell.tsx');
+let shell=fs.readFileSync(shellPath,'utf8');
+if(!shell.includes('Admin console')){
+  shell=shell.replace("BarChart3, Boxes, ClipboardList, Home, LogOut, Menu, ShoppingCart, Sparkles, Users, X", "BarChart3, Boxes, ClipboardList, Home, LogOut, Menu, ShoppingCart, ShieldCheck, Sparkles, Users, X");
+  shell=shell.replace(
+    "<div className=\"mt-8\"><p className=\"mb-3 px-3 font-mono text-[9px] font-bold uppercase tracking-[.18em] text-[hsl(var(--muted-foreground))]\">Manage</p>",
+    "<div className=\"mt-8\"><p className=\"mb-3 px-3 font-mono text-[9px] font-bold uppercase tracking-[.18em] text-[hsl(var(--muted-foreground))]\">Manage</p>{session?.role==='admin'&&<Link href=\"/admin\" onClick={()=>setOpen(false)} className={`mb-1 flex items-center gap-3 rounded-[14px] px-3.5 py-3 text-sm transition-all ${active('/admin')?'bg-[hsl(var(--sidebar-accent))] font-bold text-[hsl(var(--sidebar-accent-foreground))]':'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]'}`}><ShieldCheck className=\"h-[17px] w-[17px]\"/>Admin console</Link>}")
+  shell=shell.replace(
+    "<button onClick={logout} className=\"mt-2 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-bold text-red-600 hover:bg-red-50\">",
+    "{session?.role==='admin'&&<Link href=\"/admin\" onClick={()=>setAccountOpen(false)} className=\"mt-2 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-bold text-violet-700 hover:bg-violet-50\"><ShieldCheck className=\"h-4 w-4\"/>Admin console</Link>}<button onClick={logout} className=\"mt-2 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-bold text-red-600 hover:bg-red-50\">");
+  fs.writeFileSync(shellPath,shell);
+}
+console.log('Prepared existing App.tsx and shell for dedicated checkout, tenant-safe sale IDs, dynamic account name, and admin console.');
