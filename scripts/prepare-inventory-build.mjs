@@ -15,6 +15,7 @@ for (const file of required) {
 function replaceExact(file, from, to, label) {
   const full = path.resolve(file);
   const source = fs.readFileSync(full, 'utf8');
+  if (source.includes(to)) return;
   if (!source.includes(from)) throw new Error(`Build patch target not found (${label}) in ${file}`);
   fs.writeFileSync(full, source.replace(from, to), 'utf8');
 }
