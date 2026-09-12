@@ -4,3 +4,7 @@ services:
     runtime: static
     buildCommand: npm run build
     staticPublishPath: artifacts/electronics-inventory/dist/public
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
