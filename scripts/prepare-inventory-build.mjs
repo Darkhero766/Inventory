@@ -32,6 +32,16 @@ replaceExact('artifacts/electronics-inventory/src/App.tsx',"setEmiPlans(prev=>[{
 replaceExact('artifacts/electronics-inventory/src/App.tsx',"setEmiPayments(prev=>prev.map(p=>p.id===paymentId?{...p,status:'PAID',paidDate:new Date().toISOString()}:p));\n    setEmiPlans(prev=>prev.map(plan=>{", "const nextPayment={...payment,status:'PAID',paidDate:new Date().toISOString()}; setEmiPayments(prev=>prev.map(p=>p.id===paymentId?nextPayment:p));\n    setEmiPlans(prev=>prev.map(plan=>{",'emi paid local update');
 replaceExact('artifacts/electronics-inventory/src/App.tsx',"})); return true;\n  };\n  return { products, history, purchases, sales, customers, emiPlans, emiPayments, saveProduct", "})); const updatedPlan=emiPlans.find(p=>p.id===payment.emiPlanId); if(updatedPlan) void cloudMarkEmiPaid(nextPayment,updatedPlan).catch(err=>console.error('[cloud] EMI payment update failed',err)); return true;\n  };\n  return { products, history, purchases, sales, customers, emiPlans, emiPayments, saveProduct",'cloud emi payment persistence');
 
+// Fix TypeScript literal widening introduced by durable objects above. These are compile-time only patches.
+const appPath=path.resolve('artifacts/electronics-inventory/src/App.tsx');
+let app=fs.readFileSync(appPath,'utf8');
+app=app.replaceAll("status:'COMPLETED'", "status:'COMPLETED' as const");
+app=app.replaceAll("status:'ACTIVE'", "status:'ACTIVE' as const");
+app=app.replaceAll("status:'UPCOMING'", "status:'UPCOMING' as const");
+app=app.replaceAll("status:'PAID'", "status:'PAID' as const");
+app=app.replaceAll("status:'OVERDUE'", "status:'OVERDUE' as const");
+fs.writeFileSync(appPath,app,'utf8');
+
 // Auth/profile and tenant-cache safety.
 replaceExact('artifacts/electronics-inventory/src/auth.tsx',"import { hydrateInventoryState } from './lib/cloud-sync';","import { clearTenantCache, hydrateInventoryState } from './lib/cloud-sync';",'tenant cache auth import');
 replaceExact('artifacts/electronics-inventory/src/auth.tsx',"write(SESSION_KEY,next);write(PROFILE_KEY,next);onUpdate(next);setSaved(true);","write(SESSION_KEY,next);write(PROFILE_KEY,next);window.dispatchEvent(new Event('keystone-session-change'));onUpdate(next);setSaved(true);",'profile change event');
