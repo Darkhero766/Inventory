@@ -11,7 +11,7 @@ export type Purchase = { id: string; supplier: string; invoice: string; date: st
 export type SaleItem = { productId: string; productName: string; quantity: number; price: number; discount?: number; serialNumber?: string; imei?: string; };
 export type Sale = { id: string; date: string; invoice?: string; customerId?: string; customerName?: string; items: SaleItem[]; subtotal: number; discount: number; total: number; payment: string; purchaseCost?: number; profit?: number; discountType?: 'fixed'|'percent'; discountValue?: number; status?: 'COMPLETED'|'CANCELLED'; };
 export type Customer = { id: string; name: string; phone: string; alternatePhone?: string; email?: string; address?: string; createdAt: string; };
-export type EmiPlan = { id: string; saleId: string; customerId: string; totalAmount: number; downPayment: number; financedAmount: number; emiAmount: number; installments: number; paidInstallments: number; outstandingAmount: number; startDate: string; nextDueDate: string | null; endDate: string; frequency: 'MONTHLY'; status: 'ACTIVE'|'OVERDUE'|'PAID'; };
+export type EmiPlan = { id: string; saleId: string; customerId: string; totalAmount: number; downPayment: number; financedAmount: number; emiAmount: number; installments: number; paidInstallments: number; outstandingAmount: number; startDate: string; nextDueDate: string | null; endDate: string; frequency: 'MONTHLY'; status: 'ACTIVE'|'OVERDUE'|'PAID'; interestRate?: number; totalInterest?: number; totalRepayment?: number; };
 export type EmiPayment = { id: string; emiPlanId: string; installmentNumber: number; dueDate: string; amount: number; paidDate?: string; status: 'PAID'|'UPCOMING'|'OVERDUE'; };
 
 const pics = {
@@ -31,7 +31,6 @@ const rows: [string,string,Category,string,string,number,number,number,number,nu
 ];
 export const categories: Category[] = ['Mobile','Laptop','TV','Refrigerator','AC','Audio','Camera','Accessories'];
 export const brands = ['Samsung','Apple','LG','Sony','OnePlus','Xiaomi','Motorola','HP','Dell','Lenovo','ASUS','Acer','Whirlpool','IFB','Bosch','Haier','Voltas','Daikin','JBL','boAt','Canon','Epson','Logitech','TP-Link','Google','Vivo','TCL','Godrej','Bose','Fujifilm','Anker'];
-// Demo catalog retained for design/testing exports only. Real tenants never use it as a fallback.
 export const seedProducts: Product[] = [];
 export const money = (value: number) => new Intl.NumberFormat('en-IN', { style:'currency', currency:'INR', maximumFractionDigits:0 }).format(value);
 export const statusOf = (p: Product) => p.quantity === 0 ? 'OUT OF STOCK' : p.quantity <= p.minStock ? 'LOW STOCK' : 'IN STOCK';
