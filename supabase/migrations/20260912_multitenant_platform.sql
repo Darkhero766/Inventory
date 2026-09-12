@@ -29,6 +29,9 @@ create policy shops_owner_update on public.shops for update using (owner_id = au
 -- role='admin'. The auth trigger is the trusted profile creator.
 drop policy if exists profiles_self_insert on public.profiles;
 revoke insert on public.profiles from authenticated;
+drop policy if exists profiles_self_update on public.profiles;
+create policy profiles_self_update on public.profiles for update using (id=auth.uid()) with check (id=auth.uid());
+grant update on public.profiles to authenticated;
 
 -- Existing accounts get one shop. The generated name is intentionally safe;
 -- owners can edit it later from the shop settings UI.
