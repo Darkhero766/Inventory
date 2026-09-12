@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Check, Minus, Plus, Search, ShoppingCart, Trash2 } from 'lucide-react';
+import { ArrowRight, Minus, Plus, Search, ShoppingCart, Trash2 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { Product, readStore, seedProducts, writeStore } from '@/lib/inventory';
 import { hydrateInventoryState } from '@/lib/cloud-sync';
@@ -40,10 +40,11 @@ export default function SalesStorefront() {
     if (existing) return prev.map(x => x.productId === product.id ? { ...x, quantity: Math.min(product.quantity, x.quantity + 1) } : x);
     return [...prev, { productId: product.id, quantity: 1 }];
   });
-  const change = (id: string, delta: number) => setCart(prev => prev.map(x => {
-    if (x.productId !== id) return x;
+  const change = (id: string, delta: number) => setCart(prev => prev.flatMap(x => {
+    if (x.productId !== id) return [x];
     const product = products.find(p => p.id === id);
-    return { ...x, quantity: Math.max(1, Math.min(product?.quantity ?? 1, x.quantity + delta)) };
+    const nextQuantity = Math.min(product?.quantity ?? x.quantity, x.quantity + delta);
+    return nextQuantity <= 0 ? [] : [{ ...x, quantity: nextQuantity }];
   }));
   const remove = (id: string) => setCart(prev => prev.filter(x => x.productId !== id));
 
@@ -59,12 +60,12 @@ export default function SalesStorefront() {
         const inCart = cart.find(x => x.productId === product.id)?.quantity ?? 0;
         return <article key={product.id} className="flex min-h-[118px] items-center gap-3 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
           <ProductImage product={product} className="h-20 w-20 shrink-0 rounded-xl object-cover"/>
-          <div className="min-w-0 flex-1 self-stretch py-1"><p className="truncate text-[10px] font-bold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">{product.brand}</p><h2 className="mt-1 truncate text-sm font-extrabold">{product.name}</h2><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{money(product.sellingPrice)} · {product.quantity} available</p><div className="mt-2 flex items-center gap-2">{inCart > 0 && <div className="flex items-center rounded-xl bg-[hsl(var(--muted))] p-0.5"><button onClick={() => change(product.id, -1)} className="rounded-lg p-1"><Minus className="h-3 w-3"/></button><span className="w-5 text-center text-xs font-bold">{inCart}</span><button onClick={() => change(product.id, 1)} className="rounded-lg p-1"><Plus className="h-3 w-3"/></button></div>}<button onClick={() => add(product)} disabled={inCart >= product.quantity} className="inline-flex items-center gap-1.5 rounded-xl bg-[hsl(var(--primary))] px-3 py-1.5 text-[11px] font-bold text-[hsl(var(--primary-foreground))] disabled:opacity-50"><Plus className="h-3.5 w-3.5"/>{inCart ? 'Add more' : 'Add'}</button></div></div>
+          <div className="min-w-0 flex-1 self-stretch py-1"><p className="truncate text-[10px] font-bold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">{product.brand}</p><h2 className="mt-1 truncate text-sm font-extrabold">{product.name}</h2><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{money(product.sellingPrice)} · {product.quantity} available</p><div className="mt-2 flex items-center gap-2">{inCart > 0 && <><div className="flex items-center rounded-xl bg-[hsl(var(--muted))] p-0.5"><button onClick={() => change(product.id, -1)} className="rounded-lg p-1" aria-label={`Decrease ${product.name}`}><Minus className="h-3 w-3"/></button><span className="w-5 text-center text-xs font-bold">{inCart}</span><button onClick={() => change(product.id, 1)} className="rounded-lg p-1" disabled={inCart >= product.quantity} aria-label={`Increase ${product.name}`}><Plus className="h-3 w-3"/></button></div><button onClick={() => remove(product.id)} className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-red-200 text-red-500 transition hover:bg-red-50" aria-label={`Remove ${product.name} from cart`} title="Remove from cart"><Trash2 className="h-3.5 w-3.5"/></button></>}<button onClick={() => add(product)} disabled={inCart >= product.quantity} className="inline-flex items-center gap-1.5 rounded-xl bg-[hsl(var(--primary))] px-3 py-1.5 text-[11px] font-bold text-[hsl(var(--primary-foreground))] disabled:opacity-50"><Plus className="h-3.5 w-3.5"/>{inCart ? 'Add more' : 'Add'}</button></div></div>
         </article>;
       })}
     </div> : <div className="rounded-3xl border border-dashed p-12 text-center"><ShoppingCart className="mx-auto mb-3 h-8 w-8 text-[hsl(var(--muted-foreground))]"/><b>No products found</b><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Try another search or category.</p></div>}
 
-    {count > 0 && <div className="relative z-20 mt-5 w-full">
+    {count > 0 && <div className="sticky bottom-[92px] z-20 mt-5 w-full">
       <div className="rounded-3xl border border-white/10 bg-[hsl(var(--primary))] p-3 text-[hsl(var(--primary-foreground))] shadow-2xl shadow-black/25 backdrop-blur-xl">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/15"><ShoppingCart className="h-5 w-5"/></div>
