@@ -3,11 +3,11 @@ import fs from 'node:fs';
 const file = 'artifacts/electronics-inventory/src/pages/sales-storefront.tsx';
 let source = fs.readFileSync(file, 'utf8');
 
-// The cart must live in normal document flow: it should sit above the fixed
-// bottom navigation when reached, but it must scroll away with the page.
+// Keep the cart in normal document flow. It appears above the fixed bottom
+// navigation because of bottom spacing, but it scrolls naturally with content.
 const fixedCart = /className=\"fixed inset-x-3 bottom-\[88px\] z-40 mx-auto w-auto max-w-3xl md:inset-x-auto md:bottom-6\"/;
 const oldFlowCart = /className=\"relative z-20 mx-auto mt-6 mb-24 w-full max-w-3xl\"/;
-const cartReplacement = 'className="relative z-20 mx-auto mt-7 mb-8 w-full max-w-3xl"';
+const cartReplacement = 'className="relative z-20 mx-auto mt-7 mb-28 w-full max-w-3xl"';
 
 if (fixedCart.test(source)) {
   source = source.replace(fixedCart, cartReplacement);
