@@ -3,24 +3,28 @@ import fs from 'node:fs';
 const file = 'artifacts/electronics-inventory/src/pages/sales-storefront.tsx';
 let source = fs.readFileSync(file, 'utf8');
 
-// Keep the cart in normal document flow. It appears above the fixed bottom
-// navigation because of bottom spacing, but it scrolls naturally with content.
+// The cart is intentionally a floating overlay on mobile: it sits above the
+// fixed bottom navigation instead of becoming the last item in the product
+// list. On desktop it sits near the bottom of the viewport.
 const fixedCart = /className=\"fixed inset-x-3 bottom-\[88px\] z-40 mx-auto w-auto max-w-3xl md:inset-x-auto md:bottom-6\"/;
-const oldFlowCart = /className=\"relative z-20 mx-auto mt-6 mb-24 w-full max-w-3xl\"/;
-const cartReplacement = 'className="relative z-20 mx-auto mt-7 mb-28 w-full max-w-3xl"';
+const oldFlowCart = /className=\"relative z-20 mx-auto mt-7 mb-28 w-full max-w-3xl\"/;
+const legacyFlowCart = /className=\"relative z-20 mx-auto mt-6 mb-24 w-full max-w-3xl\"/;
+const cartReplacement = 'className="fixed inset-x-3 bottom-[88px] z-40 mx-auto w-auto max-w-3xl md:inset-x-auto md:bottom-6"';
 
-if (fixedCart.test(source)) {
-  source = source.replace(fixedCart, cartReplacement);
-  console.log('Sales cart converted from fixed positioning to document flow.');
-} else if (oldFlowCart.test(source)) {
+if (oldFlowCart.test(source)) {
   source = source.replace(oldFlowCart, cartReplacement);
-  console.log('Sales cart flow spacing normalized.');
+  console.log('Sales cart moved to floating overlay above bottom navigation.');
+} else if (legacyFlowCart.test(source)) {
+  source = source.replace(legacyFlowCart, cartReplacement);
+  console.log('Sales cart moved to floating overlay above bottom navigation.');
+} else if (fixedCart.test(source)) {
+  console.log('Sales cart already uses the correct floating position.');
 } else {
-  console.log('Sales cart is already in document flow or uses a different safe layout; no position change made.');
+  console.log('Sales cart uses a different safe layout; no position change made.');
 }
 
 // Selected products must stay visible in the storefront so the cashier can
-// increase/decrease quantity or add more. Undo any earlier patch that hid them.
+// increase/decrease quantity or add more.
 const badFilter = "p.quantity > 0 && !cart.some(line => line.productId === p.id) && (category === 'All' || p.category === category) && `${p.name} ${p.brand} ${p.model} ${p.sku}`.toLowerCase().includes(search.toLowerCase())";
 const goodFilter = "p.quantity > 0 && (category === 'All' || p.category === category) && `${p.name} ${p.brand} ${p.model} ${p.sku}`.toLowerCase().includes(search.toLowerCase())";
 if (source.includes(badFilter)) {
