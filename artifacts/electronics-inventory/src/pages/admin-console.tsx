@@ -55,6 +55,13 @@ export default function AdminConsole(){
     finally{setSaving(null);}
   };
 
+  const cards: Array<{label:string;value:number;Icon:typeof Users}> = [
+    {label:'Accounts',value:profiles.length,Icon:Users},
+    {label:'Staff',value:staffCount,Icon:UserCog},
+    {label:'Products',value:stats.products,Icon:ShieldCheck},
+    {label:'Sales',value:stats.sales,Icon:Check},
+  ];
+
   return <div className="fade-up mx-auto max-w-6xl">
     <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
       <div><p className="font-mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--muted-foreground))]">Owner / Control room</p><h1 className="mt-2 text-3xl font-bold tracking-[-.045em] md:text-4xl">Admin console</h1><p className="mt-2 max-w-2xl text-sm text-[hsl(var(--muted-foreground))]">Manage workspace accounts and see a live overview of the shop.</p></div>
@@ -63,7 +70,7 @@ export default function AdminConsole(){
     {error&&<div className="mb-5 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0"/><div><p className="font-bold">Admin data unavailable</p><p className="mt-1">{error}</p><p className="mt-2 text-xs">If this mentions the profiles table or permissions, run the admin SQL migration in Supabase first.</p></div></div>}
     {message&&<div className="mb-5 flex items-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm font-semibold text-emerald-700"><Check className="h-4 w-4"/>{message}</div>}
     <div className="mb-7 grid grid-cols-2 gap-3 md:grid-cols-4">
-      {[['Accounts',profiles.length,Users],['Staff',staffCount,UserCog],['Products',stats.products,ShieldCheck],['Sales',stats.sales,Check]].map(([label,value,Icon])=>{const I=Icon as typeof Users;return <div key={String(label)} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 shadow-sm"><I className="h-4 w-4 text-[hsl(var(--primary))]"/><p className="mt-3 text-xs text-[hsl(var(--muted-foreground))]">{label}</p><p className="mt-1 text-2xl font-extrabold">{value as number}</p></div>})}
+      {cards.map(({label,value,Icon})=><div key={label} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 shadow-sm"><Icon className="h-4 w-4 text-[hsl(var(--primary))]"/><p className="mt-3 text-xs text-[hsl(var(--muted-foreground))]">{label}</p><p className="mt-1 text-2xl font-extrabold">{value}</p></div>)}
     </div>
     <section className="overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-sm">
       <div className="flex items-center justify-between border-b border-[hsl(var(--border))] px-5 py-4"><div><p className="text-sm font-extrabold">Workspace accounts</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Admin can promote or demote accounts. Authentication passwords stay in Supabase Auth.</p></div><span className="rounded-full bg-[hsl(var(--accent))] px-3 py-1 text-[10px] font-bold">{profiles.length} accounts</span></div>
