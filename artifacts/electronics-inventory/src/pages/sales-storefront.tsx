@@ -66,8 +66,8 @@ export default function SalesStorefront() {
       })}
     </div> : <div className="rounded-3xl border border-dashed p-12 text-center"><ShoppingCart className="mx-auto mb-3 h-8 w-8 text-[hsl(var(--muted-foreground))]"/><b>No products found</b><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Try another search or category.</p></div>}
 
-    {count > 0 && <div className="fixed inset-x-3 bottom-[88px] z-40 mx-auto w-auto max-w-3xl md:inset-x-auto md:bottom-6">
-      <div className="rounded-3xl border border-white/10 bg-[hsl(var(--primary))] p-3 text-[hsl(var(--primary-foreground))] shadow-2xl shadow-black/25 backdrop-blur-xl">
+    {count > 0 && <div className="relative z-20 mx-auto mt-6 mb-28 w-full max-w-3xl">
+      <div className="rounded-3xl border border-white/10 bg-[hsl(var(--primary))] p-3 text-[hsl(var(--primary-foreground))] shadow-2xl shadow-black/25">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/15"><ShoppingCart className="h-5 w-5"/></div>
           <div className="min-w-0 flex-1"><p className="text-[10px] font-semibold uppercase tracking-[.15em] opacity-60">Current cart</p><p className="truncate text-sm font-extrabold">{count} {count === 1 ? 'item' : 'items'} · {money(total)}</p></div>
