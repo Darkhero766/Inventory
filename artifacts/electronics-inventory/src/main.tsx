@@ -2,6 +2,7 @@ import { ReactNode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import { AuthGate } from './auth';
+import AdminConsole from './pages/admin-console';
 import { supabase } from './lib/supabase';
 import { clearTenantCache, hydrateInventoryState, resetCloudHydration } from './lib/cloud-sync';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -28,8 +29,6 @@ function CloudHydrationGate({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Supabase is the source of truth. Never carry React/local cache from
-      // another authenticated account into this tenant.
       clearTenantCache();
       resetCloudHydration();
       if (alive) {
@@ -64,15 +63,18 @@ function CloudHydrationGate({ children }: { children: ReactNode }) {
   return <div key={ownerId}>{children}</div>;
 }
 
+function PlatformEntry() {
+  const isAdminRoute = window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/');
+  return isAdminRoute ? <AdminConsole /> : <CloudHydrationGate><App /></CloudHydrationGate>;
+}
+
 const root = document.getElementById('root');
 if (!root) throw new Error('Electronics Inventory: #root element was not found.');
 
 createRoot(root).render(
   <ErrorBoundary>
     <AuthGate>
-      <CloudHydrationGate>
-        <App />
-      </CloudHydrationGate>
+      <PlatformEntry />
     </AuthGate>
   </ErrorBoundary>,
 );
