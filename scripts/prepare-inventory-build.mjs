@@ -5,98 +5,36 @@ const required = [
   'artifacts/electronics-inventory/src/App.tsx',
   'artifacts/electronics-inventory/src/auth.tsx',
   'artifacts/electronics-inventory/src/lib/cloud-sync.ts',
+  'artifacts/electronics-inventory/src/lib/cloud-crud.ts',
   'artifacts/electronics-inventory/src/pages/sales-checkout.tsx',
   'artifacts/electronics-inventory/src/pages/admin-console.tsx',
 ];
-for (const file of required) {
-  if (!fs.existsSync(path.resolve(file))) throw new Error(`Required source file is missing: ${file}`);
-}
+for (const file of required) if (!fs.existsSync(path.resolve(file))) throw new Error(`Required source file is missing: ${file}`);
+function replaceExact(file, from, to, label) { const full=path.resolve(file); const source=fs.readFileSync(full,'utf8'); if(source.includes(to)) return; if(!source.includes(from)){console.warn(`Build patch target not found (${label}) in ${file}; skipping.`);return;} fs.writeFileSync(full,source.replace(from,to),'utf8'); }
 
-function replaceExact(file, from, to, label) {
-  const full = path.resolve(file);
-  const source = fs.readFileSync(full, 'utf8');
-  // The source may already contain this patch (for example after a direct
-  // source edit). In that case there is nothing to do.
-  if (source.includes(to)) return;
-  // Do not make deployment depend on an exact formatting snapshot. If the
-  // target has already been changed by a newer source version, leave it alone
-  // and let TypeScript validate the actual source below.
-  if (!source.includes(from)) {
-    console.warn(`Build patch target not found (${label}) in ${file}; skipping patch because source appears to have changed.`);
-    return;
-  }
-  fs.writeFileSync(full, source.replace(from, to), 'utf8');
-}
-
-// Dashboard identity: always use the current authenticated profile instead
-// of the old demo name, and update immediately after profile changes.
-replaceExact(
-  'artifacts/electronics-inventory/src/App.tsx',
-  "function HomePage(){const {products,sales,emiPlans}=useInventory();",
-  "function HomePage(){const {products,sales,emiPlans}=useInventory();const [accountName,setAccountName]=useState(()=>{try{return JSON.parse(localStorage.getItem('keystone-auth-session-v1')||'{}').name||'Account';}catch{return 'Account';}});useEffect(()=>{const sync=()=>{try{setAccountName(JSON.parse(localStorage.getItem('keystone-auth-session-v1')||'{}').name||'Account');}catch{setAccountName('Account');}};window.addEventListener('keystone-session-change',sync);window.addEventListener('storage',sync);return()=>{window.removeEventListener('keystone-session-change',sync);window.removeEventListener('storage',sync);};},[]);",
-  'dashboard account name state',
-);
+// Keep the dashboard identity and tenant hydration fixes idempotent.
+replaceExact('artifacts/electronics-inventory/src/App.tsx',"import NotFound from '@/pages/not-found';","import NotFound from '@/pages/not-found';\nimport { cloudSaveProduct, cloudDeleteProduct, cloudAdjustStock, cloudUpsertCustomer, cloudCreateSale, cloudCreateEmiPlan, cloudMarkEmiPaid } from '@/lib/cloud-crud';",'cloud CRUD import');
+replaceExact('artifacts/electronics-inventory/src/App.tsx','function HomePage(){const {products,sales,emiPlans}=useInventory();',"function HomePage(){const {products,sales,emiPlans}=useInventory();const [accountName,setAccountName]=useState(()=>{try{return JSON.parse(localStorage.getItem('keystone-auth-session-v1')||'{}').name||'Account';}catch{return 'Account';}});useEffect(()=>{const sync=()=>{try{setAccountName(JSON.parse(localStorage.getItem('keystone-auth-session-v1')||'{}').name||'Account');}catch{setAccountName('Account');}};window.addEventListener('keystone-session-change',sync);window.addEventListener('storage',sync);return()=>{window.removeEventListener('keystone-session-change',sync);window.removeEventListener('storage',sync);};},[]);",'dashboard account name state');
 replaceExact('artifacts/electronics-inventory/src/App.tsx','>{greeting}, Aarav</h1>','>{greeting}, {accountName}</h1>','dashboard greeting');
 replaceExact('artifacts/electronics-inventory/src/App.tsx','>AM</span>','>{accountName.slice(0,2).toUpperCase()}</span>','dashboard initials');
+replaceExact('artifacts/electronics-inventory/src/App.tsx',"useEffect(() => writeStore('keystone-emi-payments', emiPayments), [emiPayments]);","useEffect(() => writeStore('keystone-emi-payments', emiPayments), [emiPayments]);useEffect(()=>{const reload=()=>{setProducts(readStore('keystone-products',[]));setHistory(readStore('keystone-history',[]));setPurchases(readStore('keystone-purchases',[]));setSales(readStore('keystone-sales',[]));setCustomers(readStore('keystone-customers',[]));setEmiPlans(readStore('keystone-emi-plans',[]));setEmiPayments(readStore('keystone-emi-payments',[]));};window.addEventListener('keystone-inventory-hydrated',reload);return()=>window.removeEventListener('keystone-inventory-hydrated',reload);},[]);",'tenant hydration state refresh');
 
-// Reload the in-memory React inventory whenever cloud hydration switches the
-// active owner. localStorage is not enough because makeInventory keeps state.
-replaceExact(
-  'artifacts/electronics-inventory/src/App.tsx',
-  "useEffect(() => writeStore('keystone-emi-payments', emiPayments), [emiPayments]);",
-  "useEffect(() => writeStore('keystone-emi-payments', emiPayments), [emiPayments]);useEffect(()=>{const reload=()=>{setProducts(readStore('keystone-products',[]));setHistory(readStore('keystone-history',[]));setPurchases(readStore('keystone-purchases',[]));setSales(readStore('keystone-sales',[]));setCustomers(readStore('keystone-customers',[]));setEmiPlans(readStore('keystone-emi-plans',[]));setEmiPayments(readStore('keystone-emi-payments',[]));};window.addEventListener('keystone-inventory-hydrated',reload);return()=>window.removeEventListener('keystone-inventory-hydrated',reload);},[]);",
-  'tenant hydration state refresh',
-);
+// Replace client-only mutations with tenant-scoped Supabase writes. Local state remains a cache for instant rendering.
+replaceExact('artifacts/electronics-inventory/src/App.tsx',"const adjustStock = (productId: string, amount: number, type: StockEntry['type'], note: string) => {\n    const product = products.find(p => p.id === productId); if (!product || amount === 0 || product.quantity + amount < 0) return false;\n    setProducts(prev => prev.map(p => p.id === productId ? { ...p, quantity: p.quantity + amount } : p));\n    setHistory(prev => [{ id:`h-${Date.now()}-${Math.random()}`, productId, productName:product.name, type, quantity:Math.abs(amount), note, date:new Date().toISOString() }, ...prev]);\n    return true;\n  };","const adjustStock = (productId: string, amount: number, type: StockEntry['type'], note: string) => { const product=products.find(p=>p.id===productId); if(!product||amount===0||product.quantity+amount<0)return false; void cloudAdjustStock(productId,amount).catch(err=>console.error('[cloud] stock update failed',err)); setProducts(prev=>prev.map(p=>p.id===productId?{...p,quantity:p.quantity+amount}:p)); setHistory(prev=>[{id:`h-${Date.now()}-${Math.random()}`,productId,productName:product.name,type,quantity:Math.abs(amount),note,date:new Date().toISOString()},...prev]); return true; };",'cloud stock persistence');
+replaceExact('artifacts/electronics-inventory/src/App.tsx',"const saveProduct = (data: Omit<Product, 'id'|'createdAt'>, id?: string) => id ? setProducts(prev => prev.map(p => p.id === id ? { ...p, ...data } : p)) : setProducts(prev => [{ ...data, id:`p-${Date.now()}`, createdAt:new Date().toISOString() }, ...prev]);","const saveProduct = (data: Omit<Product, 'id'|'createdAt'>, id?: string) => { const nextId=id||crypto.randomUUID(); const next={...data,id:nextId,createdAt:new Date().toISOString()}; void cloudSaveProduct(next,id).then(()=>setProducts(prev=>id?prev.map(p=>p.id===id?next:p):[next,...prev])).catch(err=>console.error('[cloud] product save failed',err)); };",'cloud product persistence');
+replaceExact('artifacts/electronics-inventory/src/App.tsx',"const removeProduct = (productId: string) => { if (!products.some(p => p.id === productId)) return false; setProducts(prev => prev.filter(p => p.id !== productId)); return true; };","const removeProduct = (productId: string) => { if(!products.some(p=>p.id===productId))return false; void cloudDeleteProduct(productId).then(()=>setProducts(prev=>prev.filter(p=>p.id!==productId))).catch(err=>console.error('[cloud] product delete failed',err)); return true; };",'cloud product deletion');
+replaceExact('artifacts/electronics-inventory/src/App.tsx',"const upsertCustomer = (data: Omit<Customer, 'id'|'createdAt'>, id?: string) => { if (id) { setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...data } : c)); return id; } const newId = `cus-${Date.now()}`; setCustomers(prev => [{ ...data, id:newId, createdAt:new Date().toISOString() }, ...prev]); return newId; };","const upsertCustomer = (data: Omit<Customer, 'id'|'createdAt'>, id?: string) => { const newId=id||crypto.randomUUID(); const next={...data,id:newId,createdAt:new Date().toISOString()}; void cloudUpsertCustomer(next,id).then(()=>setCustomers(prev=>id?prev.map(c=>c.id===id?next:c):[next,...prev])).catch(err=>console.error('[cloud] customer save failed',err)); return newId; };",'cloud customer persistence');
 
-// Profile: persist the display name in both Supabase Auth metadata and the
-// public profile row, then notify the rest of the app immediately.
-replaceExact(
-  'artifacts/electronics-inventory/src/auth.tsx',
-  "import { hydrateInventoryState } from './lib/cloud-sync';",
-  "import { clearTenantCache, hydrateInventoryState } from './lib/cloud-sync';",
-  'tenant cache auth import',
-);
-replaceExact(
-  'artifacts/electronics-inventory/src/auth.tsx',
-  "if(data.user){const {error}=await supabase.auth.updateUser({data:{full_name:clean}});if(error)console.warn('[auth] name update:',error.message);}",
-  "if(data.user){const {error}=await supabase.auth.updateUser({data:{full_name:clean}});if(error)console.warn('[auth] name update:',error.message);const {error:profileError}=await supabase.from('profiles').update({name:clean,updated_at:new Date().toISOString()}).eq('id',data.user.id);if(profileError)console.warn('[auth] profile row update:',profileError.message);}",
-  'profile persistence',
-);
-replaceExact(
-  'artifacts/electronics-inventory/src/auth.tsx',
-  "write(SESSION_KEY,next);write(PROFILE_KEY,next);onUpdate(next);setSaved(true);",
-  "write(SESSION_KEY,next);write(PROFILE_KEY,next);window.dispatchEvent(new Event('keystone-session-change'));onUpdate(next);setSaved(true);",
-  'profile change event',
-);
+// Sales and EMI retain synchronous UI contracts while their durable writes happen against Supabase.
+replaceExact('artifacts/electronics-inventory/src/App.tsx',"setSales(prev => [{ ...sale, id:`sale-${Date.now()}`, date:new Date().toISOString(), purchaseCost, profit, status:'COMPLETED' }, ...prev]);","const saleId=crypto.randomUUID(); const durableSale={...sale,id:saleId,date:new Date().toISOString(),purchaseCost,profit,status:'COMPLETED'}; void cloudCreateSale(durableSale,purchaseCost,profit).catch(err=>console.error('[cloud] sale save failed',err)); setSales(prev=>[durableSale,...prev]);",'cloud sale persistence');
+replaceExact('artifacts/electronics-inventory/src/App.tsx',"const planId=`emi-${Date.now()}`; const start=new Date(data.startDate);","const planId=crypto.randomUUID(); const start=new Date(data.startDate);",'uuid emi plan');
+replaceExact('artifacts/electronics-inventory/src/App.tsx',"setEmiPlans(prev=>[{...data,id:planId,paidInstallments:0,outstandingAmount:data.financedAmount,nextDueDate:payments[0]?.dueDate??null,status:'ACTIVE'} ,...prev]);\n    setEmiPayments(prev=>[...payments,...prev]); return planId;","const plan={...data,id:planId,paidInstallments:0,outstandingAmount:data.financedAmount,nextDueDate:payments[0]?.dueDate??null,status:'ACTIVE'}; void cloudCreateEmiPlan(plan,payments).catch(err=>console.error('[cloud] EMI save failed',err)); setEmiPlans(prev=>[plan,...prev]); setEmiPayments(prev=>[...payments,...prev]); return planId;",'cloud emi persistence');
+replaceExact('artifacts/electronics-inventory/src/App.tsx',"setEmiPayments(prev=>prev.map(p=>p.id===paymentId?{...p,status:'PAID',paidDate:new Date().toISOString()}:p));\n    setEmiPlans(prev=>prev.map(plan=>{", "const nextPayment={...payment,status:'PAID',paidDate:new Date().toISOString()}; setEmiPayments(prev=>prev.map(p=>p.id===paymentId?nextPayment:p));\n    setEmiPlans(prev=>prev.map(plan=>{",'emi paid local update');
+replaceExact('artifacts/electronics-inventory/src/App.tsx',"})); return true;\n  };\n  return { products, history, purchases, sales, customers, emiPlans, emiPayments, saveProduct", "})); const updatedPlan=emiPlans.find(p=>p.id===payment.emiPlanId); if(updatedPlan) void cloudMarkEmiPaid(nextPayment,updatedPlan).catch(err=>console.error('[cloud] EMI payment update failed',err)); return true;\n  };\n  return { products, history, purchases, sales, customers, emiPlans, emiPayments, saveProduct",'cloud emi payment persistence');
 
-// Logging out must clear the local tenant cache. Without this, a second
-// account on the same phone can briefly inherit the previous account's data.
-replaceExact(
-  'artifacts/electronics-inventory/src/auth.tsx',
-  "const logout=async()=>{if(supabase)await supabase.auth.signOut();localStorage.removeItem(SESSION_KEY);localStorage.removeItem(PROFILE_KEY);setSession(null);setProfileOpen(false);};",
-  "const logout=async()=>{clearTenantCache();if(supabase)await supabase.auth.signOut();localStorage.removeItem(SESSION_KEY);localStorage.removeItem(PROFILE_KEY);setSession(null);setProfileOpen(false);window.location.assign('/');};",
-  'tenant cache logout clear',
-);
-replaceExact(
-  'artifacts/electronics-inventory/src/auth.tsx',
-  "if(!session)return <LoginScreen onLogin={setSession}/>;",
-  "if(!session)return <LoginScreen onLogin={s=>{if(s.role!=='admin'&&window.location.pathname==='/admin'){window.location.assign('/');return;}setSession(s);}}/>;",
-  'shop owner admin-route guard',
-);
+// Auth/profile and tenant-cache safety.
+replaceExact('artifacts/electronics-inventory/src/auth.tsx',"import { hydrateInventoryState } from './lib/cloud-sync';","import { clearTenantCache, hydrateInventoryState } from './lib/cloud-sync';",'tenant cache auth import');
+replaceExact('artifacts/electronics-inventory/src/auth.tsx',"write(SESSION_KEY,next);write(PROFILE_KEY,next);onUpdate(next);setSaved(true);","write(SESSION_KEY,next);write(PROFILE_KEY,next);window.dispatchEvent(new Event('keystone-session-change'));onUpdate(next);setSaved(true);",'profile change event');
+replaceExact('artifacts/electronics-inventory/src/auth.tsx',"const logout=async()=>{if(supabase)await supabase.auth.signOut();localStorage.removeItem(SESSION_KEY);localStorage.removeItem(PROFILE_KEY);setSession(null);setProfileOpen(false);};","const logout=async()=>{clearTenantCache();if(supabase)await supabase.auth.signOut();localStorage.removeItem(SESSION_KEY);localStorage.removeItem(PROFILE_KEY);setSession(null);setProfileOpen(false);window.location.assign('/');};",'tenant cache logout clear');
 
-// Checkout: protect the new local EMI state from an immediate stale cloud
-// hydration while the debounced relational snapshot sync finishes.
-replaceExact(
-  'artifacts/electronics-inventory/src/lib/cloud-sync.ts',
-  "export function resetCloudHydration(){bootPromise=null;}",
-  "let localMutationHoldUntil=0;export function resetCloudHydration(){localMutationHoldUntil=Date.now()+2000;bootPromise=Promise.resolve(true);setTimeout(()=>{if(Date.now()>=localMutationHoldUntil)bootPromise=null;},2100);}",
-  'post-checkout hydration guard',
-);
-replaceExact(
-  'artifacts/electronics-inventory/src/lib/cloud-sync.ts',
-  "export async function hydrateInventoryState(){const client=supabase;if(!client||typeof window==='undefined')return false;if(bootPromise)return bootPromise;",
-  "export async function hydrateInventoryState(){const client=supabase;if(!client||typeof window==='undefined')return false;if(Date.now()<localMutationHoldUntil)return true;if(bootPromise)return bootPromise;",
-  'hydration guard check',
-);
-
-console.log('Inventory source patches applied/validated: SaaS identity, persistent profile updates, protected post-sale EMI hydration, safe admin logout routing, per-account local cache isolation.');
+console.log('Inventory source patches applied: Supabase tenant CRUD for products/customers/sales/EMI, cache isolation, profile identity.');
