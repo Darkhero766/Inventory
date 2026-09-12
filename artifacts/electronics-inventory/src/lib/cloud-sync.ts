@@ -3,15 +3,9 @@ import { supabase } from './supabase';
 const KEYS = ['keystone-products','keystone-history','keystone-purchases','keystone-sales','keystone-customers','keystone-emi-plans','keystone-emi-payments'] as const;
 const OWNER_KEY = 'keystone-active-owner-id-v1';
 let hydrating = false;
-let timer: ReturnType<typeof setTimeout> | undefined;
 let bootPromise: Promise<boolean> | null = null;
-let syncInstalled = false;
 let cloudReady = false;
 
-const snapshot = () => Object.fromEntries(KEYS.map(key => {
-  try { return [key, JSON.parse(localStorage.getItem(key) || 'null')]; }
-  catch { return [key, null]; }
-}));
 const clearLocalInventoryCache = () => { for (const key of KEYS) localStorage.removeItem(key); };
 const notifyHydrated = () => { if (typeof window !== 'undefined') window.dispatchEvent(new Event('keystone-inventory-hydrated')); };
 
@@ -21,6 +15,7 @@ async function currentUserId() {
   const { data } = await client.auth.getUser();
   return data.user?.id ?? null;
 }
+
 async function ensureSession() {
   const client = supabase;
   if (!client) return false;
@@ -34,8 +29,6 @@ async function hydrateRelational() {
   const ownerId = await currentUserId();
   if (!ownerId) return false;
 
-  // Use the actual current database schema. The app's legacy client IDs are
-  // stored in inventory_state; relational rows use their UUID primary keys.
   const [productsRes, customersRes, salesRes, itemsRes, emiRes, paymentsRes] = await Promise.all([
     client.from('products').select('id,owner_id,name,brand,category,model,sku,serial_number,imei,purchase_price,selling_price,stock,image_url,created_at,updated_at').eq('owner_id', ownerId).order('created_at', { ascending: false }),
     client.from('customers').select('id,owner_id,name,phone,alternate_phone,email,address,created_at').eq('owner_id', ownerId).order('created_at', { ascending: false }),
@@ -44,6 +37,7 @@ async function hydrateRelational() {
     client.from('emi_plans').select('id,owner_id,sale_id,customer_id,total_amount,down_payment,financed_amount,emi_amount,installments,paid_installments,outstanding_amount,start_date,next_due_date,end_date,frequency,status').eq('owner_id', ownerId),
     client.from('emi_payments').select('id,owner_id,emi_plan_id,installment_number,due_date,amount,paid_date,status').eq('owner_id', ownerId).order('due_date', { ascending: true }),
   ]);
+
   const results = [productsRes, customersRes, salesRes, itemsRes, emiRes, paymentsRes];
   const failed = results.find(r => r.error);
   if (failed) {
@@ -55,12 +49,6 @@ async function hydrateRelational() {
   const rawCustomers = customersRes.data ?? [];
   const rawSales = salesRes.data ?? [];
   const rawEmi = emiRes.data ?? [];
-
-  // Do not replace a valid snapshot with empty relational results. This is
-  // important for databases that were created with the earlier snapshot-only
-  // migration.
-  if (!rawProducts.length && !rawCustomers.length && !rawSales.length && !rawEmi.length) return false;
-
   const products = rawProducts.map((p: any) => ({ id:p.id, name:p.name, brand:p.brand??'', category:p.category, model:p.model??'', sku:p.sku??'', purchasePrice:Number(p.purchase_price??0), sellingPrice:Number(p.selling_price??0), mrp:Number(p.selling_price??0), quantity:Number(p.stock??0), minStock:0, warranty:'', image:p.image_url??'', createdAt:p.created_at, serialNumber:p.serial_number??undefined, imei:p.imei??undefined }));
   const customers = rawCustomers.map((c: any) => ({ id:c.id, name:c.name??'', phone:c.phone??'', alternatePhone:c.alternate_phone??undefined, email:c.email??undefined, address:c.address??undefined, createdAt:c.created_at }));
   const itemsBySale = new Map<string, Array<Record<string, unknown>>>();
@@ -82,69 +70,45 @@ async function hydrateRelational() {
 }
 
 export async function hydrateInventoryState() {
-  const client=supabase;
-  if(!client||typeof window==='undefined') return false;
-  if(bootPromise) return bootPromise;
-  bootPromise=(async()=>{
-    if(!(await ensureSession())) return false;
-    hydrating=true;
-    cloudReady=false;
-    try{
-      const ownerId=await currentUserId();
-      if(!ownerId) return false;
-      const cachedOwner=localStorage.getItem(OWNER_KEY);
-      if(cachedOwner!==ownerId) clearLocalInventoryCache();
-      localStorage.setItem(OWNER_KEY,ownerId);
-
-      // Snapshot is the recovery/source-of-truth layer for existing accounts.
-      // Load the authenticated owner's snapshot first so clearing the browser
-      // never destroys cloud data and older accounts remain recoverable.
-      const {data:stateRow,error:stateError}=await client.from('inventory_state').select('state').eq('owner_id',ownerId).eq('workspace_key','default').maybeSingle();
-      let snapshotLoaded=false;
-      if(!stateError&&stateRow?.state){
-        const state=stateRow.state as Record<string,unknown>;
-        for(const key of KEYS){
-          if(state[key]!==undefined&&state[key]!==null){localStorage.setItem(key,JSON.stringify(state[key]));snapshotLoaded=true;}
-        }
-      }
-
-      const relationalLoaded=await hydrateRelational();
-      // A completely new account legitimately has no rows and no snapshot.
-      cloudReady=true;
+  const client = supabase;
+  if (!client || typeof window === 'undefined') return false;
+  if (bootPromise) return bootPromise;
+  bootPromise = (async () => {
+    if (!(await ensureSession())) return false;
+    hydrating = true;
+    cloudReady = false;
+    try {
+      const ownerId = await currentUserId();
+      if (!ownerId) return false;
+      const cachedOwner = localStorage.getItem(OWNER_KEY);
+      if (cachedOwner !== ownerId) clearLocalInventoryCache();
+      localStorage.setItem(OWNER_KEY, ownerId);
+      const loaded = await hydrateRelational();
+      cloudReady = true;
       notifyHydrated();
-      return snapshotLoaded||relationalLoaded;
-    }finally{hydrating=false;}
+      return loaded;
+    } finally {
+      hydrating = false;
+    }
   })();
   return bootPromise;
 }
 
-export function resetCloudHydration(){bootPromise=null;cloudReady=false;}
-export function clearTenantCache(){if(timer){clearTimeout(timer);timer=undefined;}clearLocalInventoryCache();localStorage.removeItem(OWNER_KEY);resetCloudHydration();}
-
-export function syncInventoryState(){
-  const client=supabase;
-  if(!client||typeof window==='undefined'||hydrating||!cloudReady) return;
-  if(timer) clearTimeout(timer);
-  timer=setTimeout(async()=>{
-    timer=undefined;
-    if(!(await ensureSession())) return;
-    const ownerId=await currentUserId();
-    if(!ownerId) return;
-    localStorage.setItem(OWNER_KEY,ownerId);
-    const state=snapshot();
-    const {error}=await client.rpc('sync_inventory_snapshot',{p_state:state});
-    if(error) console.warn('[cloud] snapshot sync failed:',error.message);
-  },350);
+export function resetCloudHydration() {
+  bootPromise = null;
+  cloudReady = false;
 }
 
-function installLocalStorageSync(){
-  if(syncInstalled||typeof window==='undefined') return;
-  syncInstalled=true;
-  const original=Storage.prototype.setItem;
-  Storage.prototype.setItem=function(key:string,value:string){
-    original.call(this,key,value);
-    if(this===window.localStorage&&(KEYS as readonly string[]).includes(key)) syncInventoryState();
-  };
+export function clearTenantCache() {
+  clearLocalInventoryCache();
+  localStorage.removeItem(OWNER_KEY);
+  resetCloudHydration();
 }
-installLocalStorageSync();
-export const cloudSyncConfigured=()=>Boolean(supabase);
+
+// Persistence is handled by the relational Supabase CRUD paths. This function
+// intentionally does not write to a missing legacy inventory_state table.
+export function syncInventoryState() {
+  if (!cloudReady || hydrating) return;
+}
+
+export const cloudSyncConfigured = () => Boolean(supabase);
