@@ -64,13 +64,13 @@ replaceExact(
 // account on the same phone can briefly inherit the previous account's data.
 replaceExact(
   'artifacts/electronics-inventory/src/auth.tsx',
-  "const logout=async()=>{if(supabase)await supabase.auth.signOut();localStorage.removeItem(SESSION_KEY);localStorage.removeItem(PROFILE_KEY);setSession(null);setProfileOpen(false);window.location.assign('/');};",
+  "const logout=async()=>{if(supabase)await supabase.auth.signOut();localStorage.removeItem(SESSION_KEY);localStorage.removeItem(PROFILE_KEY);setSession(null);setProfileOpen(false);};",
   "const logout=async()=>{clearTenantCache();if(supabase)await supabase.auth.signOut();localStorage.removeItem(SESSION_KEY);localStorage.removeItem(PROFILE_KEY);setSession(null);setProfileOpen(false);window.location.assign('/');};",
   'tenant cache logout clear',
 );
 replaceExact(
   'artifacts/electronics-inventory/src/auth.tsx',
-  "if(!session)return <LoginScreen onLogin={s=>{if(s.role!=='admin'&&window.location.pathname==='/admin'){window.location.assign('/');return;}setSession(s);}}/>;",
+  "if(!session)return <LoginScreen onLogin={setSession}/>;",
   "if(!session)return <LoginScreen onLogin={s=>{if(s.role!=='admin'&&window.location.pathname==='/admin'){window.location.assign('/');return;}setSession(s);}}/>;",
   'shop owner admin-route guard',
 );
