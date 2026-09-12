@@ -30,8 +30,23 @@ replaceExact(
 replaceExact('artifacts/electronics-inventory/src/App.tsx','>{greeting}, Aarav</h1>','>{greeting}, {accountName}</h1>','dashboard greeting');
 replaceExact('artifacts/electronics-inventory/src/App.tsx','>AM</span>','>{accountName.slice(0,2).toUpperCase()}</span>','dashboard initials');
 
+// Reload the in-memory React inventory whenever cloud hydration switches the
+// active owner. localStorage is not enough because makeInventory keeps state.
+replaceExact(
+  'artifacts/electronics-inventory/src/App.tsx',
+  "useEffect(() => writeStore('keystone-emi-payments', emiPayments), [emiPayments]);",
+  "useEffect(() => writeStore('keystone-emi-payments', emiPayments), [emiPayments]);useEffect(()=>{const reload=()=>{setProducts(readStore('keystone-products',[]));setHistory(readStore('keystone-history',[]));setPurchases(readStore('keystone-purchases',[]));setSales(readStore('keystone-sales',[]));setCustomers(readStore('keystone-customers',[]));setEmiPlans(readStore('keystone-emi-plans',[]));setEmiPayments(readStore('keystone-emi-payments',[]));};window.addEventListener('keystone-inventory-hydrated',reload);return()=>window.removeEventListener('keystone-inventory-hydrated',reload);},[]);",
+  'tenant hydration state refresh',
+);
+
 // Profile: persist the display name in both Supabase Auth metadata and the
 // public profile row, then notify the rest of the app immediately.
+replaceExact(
+  'artifacts/electronics-inventory/src/auth.tsx',
+  "import { hydrateInventoryState } from './lib/cloud-sync';",
+  "import { clearTenantCache, hydrateInventoryState } from './lib/cloud-sync';",
+  'tenant cache auth import',
+);
 replaceExact(
   'artifacts/electronics-inventory/src/auth.tsx',
   "if(data.user){const {error}=await supabase.auth.updateUser({data:{full_name:clean}});if(error)console.warn('[auth] name update:',error.message);}",
@@ -45,18 +60,17 @@ replaceExact(
   'profile change event',
 );
 
-// Logging out of the platform admin must never leave a shop owner at /admin.
-// Otherwise Wouter renders its 404 because /admin is intentionally only
-// handled by InventoryShell for an authenticated admin session.
+// Logging out must clear the local tenant cache. Without this, a second
+// account on the same phone can briefly inherit the previous account's data.
 replaceExact(
   'artifacts/electronics-inventory/src/auth.tsx',
-  "const logout=async()=>{if(supabase)await supabase.auth.signOut();localStorage.removeItem(SESSION_KEY);setSession(null);setProfileOpen(false);};",
   "const logout=async()=>{if(supabase)await supabase.auth.signOut();localStorage.removeItem(SESSION_KEY);localStorage.removeItem(PROFILE_KEY);setSession(null);setProfileOpen(false);window.location.assign('/');};",
-  'logout route reset',
+  "const logout=async()=>{clearTenantCache();if(supabase)await supabase.auth.signOut();localStorage.removeItem(SESSION_KEY);localStorage.removeItem(PROFILE_KEY);setSession(null);setProfileOpen(false);window.location.assign('/');};",
+  'tenant cache logout clear',
 );
 replaceExact(
   'artifacts/electronics-inventory/src/auth.tsx',
-  "if(!session)return <LoginScreen onLogin={setSession}/>;",
+  "if(!session)return <LoginScreen onLogin={s=>{if(s.role!=='admin'&&window.location.pathname==='/admin'){window.location.assign('/');return;}setSession(s);}}/>;",
   "if(!session)return <LoginScreen onLogin={s=>{if(s.role!=='admin'&&window.location.pathname==='/admin'){window.location.assign('/');return;}setSession(s);}}/>;",
   'shop owner admin-route guard',
 );
@@ -76,4 +90,4 @@ replaceExact(
   'hydration guard check',
 );
 
-console.log('Inventory source patches applied: SaaS identity, persistent profile updates, protected post-sale EMI hydration, safe admin logout routing.');
+console.log('Inventory source patches applied: SaaS identity, persistent profile updates, protected post-sale EMI hydration, safe admin logout routing, per-account local cache isolation.');
