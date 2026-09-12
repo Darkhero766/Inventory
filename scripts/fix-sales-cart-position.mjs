@@ -1,31 +1,32 @@
 import fs from 'node:fs';
 
-const file = 'artifacts/electronics-inventory/src/App.tsx';
+const file = 'artifacts/electronics-inventory/src/pages/sales-storefront.tsx';
 let source = fs.readFileSync(file, 'utf8');
 
-// The storefront patch may already have converted the cart to normal document
-// flow. This script is intentionally idempotent: patch it when the old fixed
-// positioning is present, otherwise leave the already-correct source alone.
-const patterns = [
-  /className=\"fixed bottom-20 left-1\/2 z-40 w-\[calc\(100%-24px\)\] max-w-2xl -translate-x-1\/2 rounded-2xl border border-\[hsl\(var\(--border\)\)\] bg-\[hsl\(var\(--card\)\)\]\/95 p-2 shadow-2xl backdrop-blur-xl sm:bottom-5\"/,
-  /className=\"fixed bottom-20 left-1\/2 z-40 w-\[calc\(100%-24px\)\] max-w-2xl -translate-x-1\/2 rounded-2xl/,
-  /className=\"fixed bottom-20[^\"]*max-w-2xl[^\"]*\"/,
-];
+// The cart must live in normal document flow: it should sit above the fixed
+// bottom navigation when reached, but it must scroll away with the page.
+const fixedCart = /className=\"fixed inset-x-3 bottom-\[88px\] z-40 mx-auto w-auto max-w-3xl md:inset-x-auto md:bottom-6\"/;
+const oldFlowCart = /className=\"relative z-20 mx-auto mt-6 mb-24 w-full max-w-3xl\"/;
+const cartReplacement = 'className="relative z-20 mx-auto mt-7 mb-8 w-full max-w-3xl"';
 
-const replacement = 'className="relative z-20 mx-auto mt-6 mb-24 w-full max-w-2xl rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))]/95 p-2 shadow-2xl backdrop-blur-xl"';
-
-let changed = false;
-for (const pattern of patterns) {
-  if (pattern.test(source)) {
-    source = source.replace(pattern, replacement);
-    changed = true;
-    break;
-  }
-}
-
-if (changed) {
-  fs.writeFileSync(file, source);
-  console.log('Sales cart position fixed: converted to normal document flow above bottom navigation.');
+if (fixedCart.test(source)) {
+  source = source.replace(fixedCart, cartReplacement);
+  console.log('Sales cart converted from fixed positioning to document flow.');
+} else if (oldFlowCart.test(source)) {
+  source = source.replace(oldFlowCart, cartReplacement);
+  console.log('Sales cart flow spacing normalized.');
 } else {
-  console.log('Sales cart position already uses normal document flow; no position patch needed.');
+  console.log('Sales cart is already in document flow or uses a different safe layout; no position change made.');
 }
+
+// Once a product is added, remove it from the product picker. This prevents
+// accidental duplicate selection while allowing multiple different products
+// to be accumulated in the cart. Cart contents remain available via checkout.
+const filterNeedle = "p.quantity > 0 && (category === 'All' || p.category === category) && `${p.name} ${p.brand} ${p.model} ${p.sku}`.toLowerCase().includes(search.toLowerCase())";
+const filterReplacement = "p.quantity > 0 && !cart.some(line => line.productId === p.id) && (category === 'All' || p.category === category) && `${p.name} ${p.brand} ${p.model} ${p.sku}`.toLowerCase().includes(search.toLowerCase())";
+if (source.includes(filterNeedle) && !source.includes('!cart.some(line => line.productId === p.id)')) {
+  source = source.replace(filterNeedle, filterReplacement);
+  console.log('Selected sales products now disappear from the picker.');
+}
+
+fs.writeFileSync(file, source);
