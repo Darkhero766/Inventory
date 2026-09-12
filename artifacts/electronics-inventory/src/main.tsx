@@ -28,8 +28,8 @@ function CloudHydrationGate({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Never allow a previous account's React/local cache to become the
-      // source of truth for the new account. Supabase is authoritative.
+      // Supabase is the source of truth. Never carry React/local cache from
+      // another authenticated account into this tenant.
       clearTenantCache();
       resetCloudHydration();
       if (alive) {
@@ -52,6 +52,8 @@ function CloudHydrationGate({ children }: { children: ReactNode }) {
     return () => {
       alive = false;
       subscription.subscription.unsubscribe();
+      clearTenantCache();
+      resetCloudHydration();
     };
   }, []);
 
