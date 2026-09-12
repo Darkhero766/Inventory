@@ -19,14 +19,22 @@ if (fixedCart.test(source)) {
   console.log('Sales cart is already in document flow or uses a different safe layout; no position change made.');
 }
 
-// Once a product is added, remove it from the product picker. This prevents
-// accidental duplicate selection while allowing multiple different products
-// to be accumulated in the cart. Cart contents remain available via checkout.
-const filterNeedle = "p.quantity > 0 && (category === 'All' || p.category === category) && `${p.name} ${p.brand} ${p.model} ${p.sku}`.toLowerCase().includes(search.toLowerCase())";
-const filterReplacement = "p.quantity > 0 && !cart.some(line => line.productId === p.id) && (category === 'All' || p.category === category) && `${p.name} ${p.brand} ${p.model} ${p.sku}`.toLowerCase().includes(search.toLowerCase())";
-if (source.includes(filterNeedle) && !source.includes('!cart.some(line => line.productId === p.id)')) {
-  source = source.replace(filterNeedle, filterReplacement);
-  console.log('Selected sales products now disappear from the picker.');
+// Selected products must stay visible in the storefront so the cashier can
+// increase/decrease quantity or add more. Undo any earlier patch that hid them.
+const badFilter = "p.quantity > 0 && !cart.some(line => line.productId === p.id) && (category === 'All' || p.category === category) && `${p.name} ${p.brand} ${p.model} ${p.sku}`.toLowerCase().includes(search.toLowerCase())";
+const goodFilter = "p.quantity > 0 && (category === 'All' || p.category === category) && `${p.name} ${p.brand} ${p.model} ${p.sku}`.toLowerCase().includes(search.toLowerCase())";
+if (source.includes(badFilter)) {
+  source = source.replace(badFilter, goodFilter);
+  console.log('Selected products remain visible in the sales picker.');
+}
+
+// Do not let async cloud hydration overwrite a cart that the cashier has
+// already started building.
+const oldHydration = "setProducts(readStore('keystone-products', seedProducts));\n      setCart(readStore('keystone-sale-draft', []));\n      setHydrating(false);";
+const newHydration = "setProducts(readStore('keystone-products', seedProducts));\n      const persistedDraft = readStore<CartLine[]>('keystone-sale-draft', []);\n      setCart(prev => prev.length ? prev : persistedDraft);\n      setHydrating(false);";
+if (source.includes(oldHydration)) {
+  source = source.replace(oldHydration, newHydration);
+  console.log('Sales cart hydration race fixed.');
 }
 
 fs.writeFileSync(file, source);
