@@ -8,15 +8,91 @@ async function ownerId() {
 }
 
 export async function cloudSaveProduct(product: any, existingId?: string) {
-  if (!supabase) return;
+  if (!supabase) return product.id;
   const owner_id = await ownerId();
   const row = { owner_id, name: product.name, brand: product.brand ?? '', category: product.category ?? '', model: product.model ?? '', sku: product.sku ?? '', serial_number: product.serialNumber ?? null, imei: product.imei ?? null, purchase_price: Number(product.purchasePrice ?? 0), selling_price: Number(product.sellingPrice ?? 0), stock: Number(product.quantity ?? 0), image_url: product.image ?? null, updated_at: new Date().toISOString() };
-  if (existingId) { const { error } = await supabase.from('products').update(row).eq('id', existingId).eq('owner_id', owner_id); if (error) throw error; return existingId; }
-  const id = crypto.randomUUID(); const { error } = await supabase.from('products').insert({ id, ...row }); if (error) throw error; return id;
+  if (existingId) {
+    const { error } = await supabase.from('products').update(row).eq('id', existingId).eq('owner_id', owner_id);
+    if (error) throw error;
+    return existingId;
+  }
+  const id = product.id || crypto.randomUUID();
+  const { error } = await supabase.from('products').insert({ id, ...row });
+  if (error) throw error;
+  return id;
 }
-export async function cloudDeleteProduct(id: string) { if (!supabase) return; const owner_id = await ownerId(); const { error } = await supabase.from('products').delete().eq('id', id).eq('owner_id', owner_id); if (error) throw error; }
-export async function cloudAdjustStock(id: string, amount: number) { if (!supabase || amount === 0) return; const owner_id = await ownerId(); const { data, error } = await supabase.from('products').select('stock').eq('id', id).eq('owner_id', owner_id).single(); if (error) throw error; const stock = Number(data.stock ?? 0) + amount; if (stock < 0) throw new Error('Insufficient stock.'); const { error: updateError } = await supabase.from('products').update({ stock, updated_at: new Date().toISOString() }).eq('id', id).eq('owner_id', owner_id); if (updateError) throw updateError; }
-export async function cloudUpsertCustomer(customer: any, existingId?: string) { if (!supabase) return customer.id; const owner_id = await ownerId(); const row = { owner_id, name: customer.name ?? '', phone: customer.phone ?? '', alternate_phone: customer.alternatePhone ?? null, email: customer.email ?? null, address: customer.address ?? null }; if (existingId) { const { error } = await supabase.from('customers').update(row).eq('id', existingId).eq('owner_id', owner_id); if (error) throw error; return existingId; } const id = crypto.randomUUID(); const { error } = await supabase.from('customers').insert({ id, ...row }); if (error) throw error; return id; }
-export async function cloudCreateSale(sale: any, purchaseCost: number, profit: number) { if (!supabase) return sale.id; const owner_id = await ownerId(); const id = sale.id || crypto.randomUUID(); const { error: saleError } = await supabase.from('sales').insert({ id, owner_id, customer_id: sale.customerId ?? null, invoice_number: sale.invoice ?? `INV-${Date.now()}`, sale_date: sale.date ?? new Date().toISOString(), subtotal: Number(sale.subtotal ?? 0), discount_type: sale.discountType ?? null, discount_value: Number(sale.discountValue ?? 0), discount_amount: Number(sale.discount ?? 0), final_amount: Number(sale.total ?? 0), purchase_cost: purchaseCost, profit, payment_method: sale.payment ?? '', status: 'COMPLETED' }); if (saleError) throw saleError; const items = (sale.items ?? []).map((item: any) => ({ id: crypto.randomUUID(), owner_id, sale_id: id, product_id: item.productId, quantity: Number(item.quantity ?? 0), unit_price: Number(item.price ?? 0), discount: Number(item.discount ?? 0), final_price: Number(item.price ?? 0) * Number(item.quantity ?? 0) - Number(item.discount ?? 0) })); const { error: itemError } = await supabase.from('sale_items').insert(items); if (itemError) { await supabase.from('sales').delete().eq('id', id).eq('owner_id', owner_id); throw itemError; } for (const item of sale.items ?? []) await cloudAdjustStock(item.productId, -Number(item.quantity ?? 0)); return id; }
-export async function cloudCreateEmiPlan(plan: any, payments: any[]) { if (!supabase) return plan.id; const owner_id = await ownerId(); const { error } = await supabase.from('emi_plans').insert({ id: plan.id, owner_id, sale_id: plan.saleId, customer_id: plan.customerId, total_amount: plan.totalAmount, down_payment: plan.downPayment, financed_amount: plan.financedAmount, emi_amount: plan.emiAmount, installments: plan.installments, paid_installments: 0, outstanding_amount: plan.financedAmount, start_date: plan.startDate, next_due_date: plan.nextDueDate, end_date: plan.endDate, frequency: plan.frequency, status: 'ACTIVE' }); if (error) throw error; const rows = payments.map((p: any) => ({ id: p.id, owner_id, emi_plan_id: plan.id, installment_number: p.installmentNumber, due_date: p.dueDate, amount: p.amount, paid_date: null, status: p.status })); if (rows.length) { const { error: paymentError } = await supabase.from('emi_payments').insert(rows); if (paymentError) { await supabase.from('emi_plans').delete().eq('id', plan.id).eq('owner_id', owner_id); throw paymentError; } } return plan.id; }
-export async function cloudMarkEmiPaid(payment: any, plan: any) { if (!supabase) return; const owner_id = await ownerId(); const paidDate = new Date().toISOString().slice(0, 10); const { error: paymentError } = await supabase.from('emi_payments').update({ status: 'PAID', paid_date: paidDate }).eq('id', payment.id).eq('owner_id', owner_id); if (paymentError) throw paymentError; const { error: planError } = await supabase.from('emi_plans').update({ paid_installments: plan.paidInstallments, outstanding_amount: plan.outstandingAmount, next_due_date: plan.nextDueDate, status: plan.status }).eq('id', plan.id).eq('owner_id', owner_id); if (planError) throw planError; }
+
+export async function cloudDeleteProduct(id: string) {
+  if (!supabase) return;
+  const owner_id = await ownerId();
+  const { error } = await supabase.from('products').delete().eq('id', id).eq('owner_id', owner_id);
+  if (error) throw error;
+}
+
+export async function cloudAdjustStock(id: string, amount: number) {
+  if (!supabase || amount === 0) return;
+  const owner_id = await ownerId();
+  const { data, error } = await supabase.from('products').select('stock').eq('id', id).eq('owner_id', owner_id).single();
+  if (error) throw error;
+  const stock = Number(data.stock ?? 0) + amount;
+  if (stock < 0) throw new Error('Insufficient stock.');
+  const { error: updateError } = await supabase.from('products').update({ stock, updated_at: new Date().toISOString() }).eq('id', id).eq('owner_id', owner_id);
+  if (updateError) throw updateError;
+}
+
+export async function cloudUpsertCustomer(customer: any, existingId?: string) {
+  if (!supabase) return customer.id;
+  const owner_id = await ownerId();
+  const row = { owner_id, name: customer.name ?? '', phone: customer.phone ?? '', alternate_phone: customer.alternatePhone ?? null, email: customer.email ?? null, address: customer.address ?? null };
+  if (existingId) {
+    const { error } = await supabase.from('customers').update(row).eq('id', existingId).eq('owner_id', owner_id);
+    if (error) throw error;
+    return existingId;
+  }
+  const id = customer.id || crypto.randomUUID();
+  const { error } = await supabase.from('customers').insert({ id, ...row });
+  if (error) throw error;
+  return id;
+}
+
+export async function cloudCreateSale(sale: any, purchaseCost: number, profit: number) {
+  if (!supabase) return sale.id;
+  const owner_id = await ownerId();
+  const id = sale.id || crypto.randomUUID();
+  const { error: saleError } = await supabase.from('sales').insert({ id, owner_id, customer_id: sale.customerId ?? null, invoice_number: sale.invoice ?? `INV-${Date.now()}`, sale_date: sale.date ?? new Date().toISOString(), subtotal: Number(sale.subtotal ?? 0), discount_type: sale.discountType ?? null, discount_value: Number(sale.discountValue ?? 0), discount_amount: Number(sale.discount ?? 0), final_amount: Number(sale.total ?? 0), purchase_cost: purchaseCost, profit, payment_method: sale.payment ?? '', status: 'COMPLETED' });
+  if (saleError) throw saleError;
+  const items = (sale.items ?? []).map((item: any) => ({ id: crypto.randomUUID(), owner_id, sale_id: id, product_id: item.productId, quantity: Number(item.quantity ?? 0), unit_price: Number(item.price ?? 0), discount: Number(item.discount ?? 0), final_price: Number(item.price ?? 0) * Number(item.quantity ?? 0) - Number(item.discount ?? 0) }));
+  const { error: itemError } = await supabase.from('sale_items').insert(items);
+  if (itemError) {
+    await supabase.from('sales').delete().eq('id', id).eq('owner_id', owner_id);
+    throw itemError;
+  }
+  // Stock is already persisted by App's adjustStock path. Do not decrement again here.
+  return id;
+}
+
+export async function cloudCreateEmiPlan(plan: any, payments: any[]) {
+  if (!supabase) return plan.id;
+  const owner_id = await ownerId();
+  const { error } = await supabase.from('emi_plans').insert({ id: plan.id, owner_id, sale_id: plan.saleId, customer_id: plan.customerId, total_amount: plan.totalAmount, down_payment: plan.downPayment, financed_amount: plan.financedAmount, emi_amount: plan.emiAmount, installments: plan.installments, paid_installments: 0, outstanding_amount: plan.financedAmount, start_date: plan.startDate, next_due_date: plan.nextDueDate, end_date: plan.endDate, frequency: plan.frequency, status: 'ACTIVE' });
+  if (error) throw error;
+  const rows = payments.map((p: any) => ({ id: p.id, owner_id, emi_plan_id: plan.id, installment_number: p.installmentNumber, due_date: p.dueDate, amount: p.amount, paid_date: null, status: p.status }));
+  if (rows.length) {
+    const { error: paymentError } = await supabase.from('emi_payments').insert(rows);
+    if (paymentError) {
+      await supabase.from('emi_plans').delete().eq('id', plan.id).eq('owner_id', owner_id);
+      throw paymentError;
+    }
+  }
+  return plan.id;
+}
+
+export async function cloudMarkEmiPaid(payment: any, plan: any) {
+  if (!supabase) return;
+  const owner_id = await ownerId();
+  const paidDate = new Date().toISOString().slice(0, 10);
+  const { error: paymentError } = await supabase.from('emi_payments').update({ status: 'PAID', paid_date: paidDate }).eq('id', payment.id).eq('owner_id', owner_id);
+  if (paymentError) throw paymentError;
+  const { error: planError } = await supabase.from('emi_plans').update({ paid_installments: plan.paidInstallments, outstanding_amount: plan.outstandingAmount, next_due_date: plan.nextDueDate, status: plan.status }).eq('id', plan.id).eq('owner_id', owner_id);
+  if (planError) throw planError;
+}
