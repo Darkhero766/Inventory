@@ -45,6 +45,22 @@ replaceExact(
   'profile change event',
 );
 
+// Logging out of the platform admin must never leave a shop owner at /admin.
+// Otherwise Wouter renders its 404 because /admin is intentionally only
+// handled by InventoryShell for an authenticated admin session.
+replaceExact(
+  'artifacts/electronics-inventory/src/auth.tsx',
+  "const logout=async()=>{if(supabase)await supabase.auth.signOut();localStorage.removeItem(SESSION_KEY);setSession(null);setProfileOpen(false);};",
+  "const logout=async()=>{if(supabase)await supabase.auth.signOut();localStorage.removeItem(SESSION_KEY);localStorage.removeItem(PROFILE_KEY);setSession(null);setProfileOpen(false);window.location.assign('/');};",
+  'logout route reset',
+);
+replaceExact(
+  'artifacts/electronics-inventory/src/auth.tsx',
+  "if(!session)return <LoginScreen onLogin={setSession}/>;",
+  "if(!session)return <LoginScreen onLogin={s=>{if(s.role!=='admin'&&window.location.pathname==='/admin'){window.location.assign('/');return;}setSession(s);}}/>;",
+  'shop owner admin-route guard',
+);
+
 // Checkout: protect the new local EMI state from an immediate stale cloud
 // hydration while the debounced relational snapshot sync finishes.
 replaceExact(
@@ -60,4 +76,4 @@ replaceExact(
   'hydration guard check',
 );
 
-console.log('Inventory source patches applied: SaaS identity, persistent profile updates, protected post-sale EMI hydration.');
+console.log('Inventory source patches applied: SaaS identity, persistent profile updates, protected post-sale EMI hydration, safe admin logout routing.');
