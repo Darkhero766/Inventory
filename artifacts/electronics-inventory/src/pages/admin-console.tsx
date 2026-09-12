@@ -59,7 +59,7 @@ export default function AdminConsole(){
     {error&&<div className="mb-5 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0"/><div><p className="font-bold">Platform data unavailable</p><p className="mt-1">{error}</p><p className="mt-2 text-xs">Run the latest multi-tenant SQL migration in Supabase, then refresh this page.</p></div></div>}
 
     <div className="mb-7 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-      {cards.map(({label,value:val,icon:Icon})=><div key={label} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 shadow-sm"><Icon className="h-4 w-4 text-[hsl(var(--primary))]"/><p className="mt-3 text-[11px] text-[hsl(var(--muted-foreground))]">{label}</p><p className="mt-1 text-2xl font-extrabold tracking-[-.04em]">{loading?'—':val}</p></div>)}
+      {cards.map(card=><div key={card.label} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 shadow-sm"><card.icon className="h-4 w-4 text-[hsl(var(--primary))]"/><p className="mt-3 text-[11px] text-[hsl(var(--muted-foreground))]">{card.label}</p><p className="mt-1 text-2xl font-extrabold tracking-[-.04em]">{loading?'—':card.value}</p></div>)}
     </div>
 
     <div className="mb-7 grid gap-3 sm:grid-cols-3">
