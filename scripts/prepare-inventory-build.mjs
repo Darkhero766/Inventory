@@ -42,6 +42,10 @@ app=app.replaceAll("status:'PAID'", "status:'PAID' as const");
 app=app.replaceAll("status:'OVERDUE'", "status:'OVERDUE' as const");
 fs.writeFileSync(appPath,app,'utf8');
 
+// Product creation used to read seedProducts[0].image, but the real tenant catalog intentionally has no seed rows.
+// Keep a blank image when no URL is provided so submitting the form never throws.
+replaceExact('artifacts/electronics-inventory/src/App.tsx',"image:form.image||seedProducts[0].image","image:form.image||''",'empty seed catalog product image');
+
 // Auth/profile and tenant-cache safety.
 replaceExact('artifacts/electronics-inventory/src/auth.tsx',"import { hydrateInventoryState } from './lib/cloud-sync';","import { clearTenantCache, hydrateInventoryState } from './lib/cloud-sync';",'tenant cache auth import');
 replaceExact('artifacts/electronics-inventory/src/auth.tsx',"write(SESSION_KEY,next);write(PROFILE_KEY,next);onUpdate(next);setSaved(true);","write(SESSION_KEY,next);write(PROFILE_KEY,next);window.dispatchEvent(new Event('keystone-session-change'));onUpdate(next);setSaved(true);",'profile change event');
