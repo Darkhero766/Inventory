@@ -31,7 +31,8 @@ const rows: [string,string,Category,string,string,number,number,number,number,nu
 ];
 export const categories: Category[] = ['Mobile','Laptop','TV','Refrigerator','AC','Audio','Camera','Accessories'];
 export const brands = ['Samsung','Apple','LG','Sony','OnePlus','Xiaomi','Motorola','HP','Dell','Lenovo','ASUS','Acer','Whirlpool','IFB','Bosch','Haier','Voltas','Daikin','JBL','boAt','Canon','Epson','Logitech','TP-Link','Google','Vivo','TCL','Godrej','Bose','Fujifilm','Anker'];
-export const seedProducts: Product[] = rows.map((r, i) => ({ id: `p-${i+1}`, name:r[0], brand:r[1], category:r[2] as Category, model:r[3], sku:r[4], purchasePrice:r[5], sellingPrice:r[6], mrp:r[7], quantity:r[8], minStock:r[9], warranty:r[10], image:r[11], createdAt: new Date(Date.now() - i * 86400000 * 2).toISOString() }));
+// Demo catalog retained for design/testing exports only. Real tenants never use it as a fallback.
+export const seedProducts: Product[] = [];
 export const money = (value: number) => new Intl.NumberFormat('en-IN', { style:'currency', currency:'INR', maximumFractionDigits:0 }).format(value);
 export const statusOf = (p: Product) => p.quantity === 0 ? 'OUT OF STOCK' : p.quantity <= p.minStock ? 'LOW STOCK' : 'IN STOCK';
 export const readStore = <T,>(key: string, fallback: T): T => { try { const value = localStorage.getItem(key); return value ? JSON.parse(value) : fallback; } catch { return fallback; } };
