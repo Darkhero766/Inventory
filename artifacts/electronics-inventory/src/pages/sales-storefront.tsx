@@ -49,7 +49,9 @@ export default function SalesStorefront() {
   }));
   const remove = (id: string) => setCart(prev => prev.filter(x => x.productId !== id));
 
-  const cartBar = count > 0 ? <div className="mx-auto mt-5 w-full max-w-3xl pb-1">
+  // Sticky inside the scrolling sales content: it floats above the fixed tab bar
+  // while scrolling, but remains part of document flow and releases at the end.
+  const cartBar = count > 0 ? <div className="sticky bottom-24 z-30 mx-auto mt-5 w-full max-w-3xl pb-2">
     <div className="rounded-3xl border border-white/10 bg-[hsl(var(--primary))] p-3 text-[hsl(var(--primary-foreground))] shadow-2xl shadow-black/20 ring-1 ring-black/5 backdrop-blur-xl">
       <div className="flex items-center gap-3">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/15"><ShoppingCart className="h-5 w-5"/></div>
