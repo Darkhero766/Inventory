@@ -44,9 +44,18 @@ export async function cloudCreateSale(sale: any, purchaseCost: number, profit: n
   const baseSaleRow = { owner_id, invoice_number: sale.invoice ?? `INV-${Date.now()}`, customer_id, sale_date: sale.date ?? new Date().toISOString(), subtotal: Number(sale.subtotal ?? 0), discount_type: sale.discountType ?? null, discount_value: Number(sale.discountValue ?? 0), discount_amount: Number(sale.discount ?? 0), final_amount: Number(sale.total ?? 0), purchase_cost: purchaseCost, profit, payment_method, status: 'COMPLETED' };
   let saleInsert = await supabase.from('sales').insert({ ...baseSaleRow, client_id }).select('id').single();
   if (saleInsert.error && /client_id.*sales|sales.*client_id/i.test(saleInsert.error.message)) saleInsert = await supabase.from('sales').insert(baseSaleRow).select('id').single();
-  // Older deployed databases may reject the newer EMI value. Store the sale as Cash only as a
-  // compatibility fallback; the linked EMI plan remains the source of truth and hydration below
-  // restores the displayed payment method to EMI.
+
+  // Some already-provisioned databases use the older lowercase sales status enum/check
+  // (for example: 'completed') while newer migrations use 'COMPLETED'. Retry with the
+  // legacy spelling so an otherwise valid sale is not blocked by schema drift.
+  if (saleInsert.error && /sales_status_check|status/i.test(saleInsert.error.message)) {
+    const legacyStatusRow = { ...baseSaleRow, status: 'completed' };
+    saleInsert = await supabase.from('sales').insert({ ...legacyStatusRow, client_id }).select('id').single();
+    if (saleInsert.error && /client_id.*sales|sales.*client_id/i.test(saleInsert.error.message)) saleInsert = await supabase.from('sales').insert(legacyStatusRow).select('id').single();
+  }
+
+  // Older deployed databases may reject the newer EMI payment method. Store the sale as
+  // Cash only as a compatibility fallback; the linked EMI plan remains the source of truth.
   if (saleInsert.error && payment_method === 'EMI' && /sales_payment_method_check|payment_method/i.test(saleInsert.error.message)) {
     const legacyRow = { ...baseSaleRow, payment_method: 'Cash' };
     saleInsert = await supabase.from('sales').insert({ ...legacyRow, client_id }).select('id').single();
@@ -55,6 +64,7 @@ export async function cloudCreateSale(sale: any, purchaseCost: number, profit: n
   if (saleInsert.error) {
     const detail = saleInsert.error.message;
     if (/sales_payment_method_check|payment_method/i.test(detail)) throw new Error(`Sale could not be saved: Supabase rejected payment method "${payment_method}". Run migration 20260913_emi_payment_method_fix.sql in Supabase SQL Editor, then retry.`);
+    if (/sales_status_check|status/i.test(detail)) throw new Error('Sale could not be saved: the Supabase sales status constraint is using an incompatible value. Run migration 20260913_sales_status_fix.sql in Supabase SQL Editor, then retry.');
     throw new Error(`Sale could not be saved: ${detail}`);
   }
   const dbSaleId = saleInsert.data.id;
