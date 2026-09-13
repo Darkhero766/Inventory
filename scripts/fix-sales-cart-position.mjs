@@ -3,41 +3,38 @@ import fs from 'node:fs';
 const file = 'artifacts/electronics-inventory/src/pages/sales-storefront.tsx';
 let source = fs.readFileSync(file, 'utf8');
 
-// The cart summary is viewport-fixed on mobile and sits directly above the
-// InventoryShell bottom tabs. Product content scrolls behind it; the cart does
-// not move with the page. On larger screens it returns to a normal bottom
-// offset because the mobile tab bar is not present there.
-const fixedClass = 'className="fixed left-3 right-3 bottom-[92px] z-40 mx-auto w-auto max-w-3xl rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))]/95 p-2 shadow-2xl backdrop-blur-xl sm:bottom-6"';
-
-// Handle every cart positioning version introduced by earlier build patches.
-// These patterns are intentionally limited to the sales cart wrapper.
-const positionPatterns = [
+// The sales cart must be part of the document flow. It should sit naturally
+// above the fixed mobile navigation, but it must scroll away with the product
+// list instead of sticking to the viewport.
+const replacement = 'className="relative z-20 mx-auto mt-6 mb-24 w-full max-w-3xl"';
+const patterns = [
+  /className="sticky bottom-\[88px\] z-20 mx-auto mt-5 w-full max-w-3xl px-0\.5 pb-1"/,
+  /className="sticky bottom-\[[^\]]+\] z-20 mx-auto[^\"]*max-w-3xl[^\"]*"/,
+  /className="fixed left-3 right-3 bottom-\[[^\]]+\] z-40[^\"]*"/,
+  /className="fixed bottom-20 left-1\/2 z-40[^\"]*"/,
+  /className="fixed bottom-20[^\"]*max-w-2xl[^\"]*"/,
   /className="relative z-10 mx-auto mt-6 mb-24 w-full max-w-3xl"/,
   /className="relative z-20 mx-auto mt-6 mb-24 w-full max-w-3xl"/,
   /className="relative z-20 mx-auto mt-7 mb-28 w-full max-w-3xl"/,
-  /className="fixed bottom-20 left-1\/2 z-40 w-\[calc\(100%-24px\)\] max-w-2xl -translate-x-1\/2 rounded-2xl[^\"]*"/,
-  /className="fixed bottom-20[^\"]*max-w-2xl[^\"]*"/,
-  /className="fixed inset-x-3 bottom-\[88px\] z-40[^\"]*"/,
-  /className="fixed inset-x-3 bottom-20 z-40[^\"]*"/,
-  /className="fixed inset-x-3 bottom-\[92px\] z-40[^\"]*"/,
-  /className="fixed left-3 right-3 bottom-\[92px\] z-40[^\"]*"/,
 ];
 
 let changed = false;
-for (const pattern of positionPatterns) {
+for (const pattern of patterns) {
   if (pattern.test(source)) {
-    source = source.replace(pattern, fixedClass);
+    source = source.replace(pattern, replacement);
     changed = true;
     break;
   }
 }
 
-if (!changed && !source.includes(fixedClass)) {
-  throw new Error('Sales cart wrapper not found; refusing to modify unrelated code.');
+// If the storefront already has a normal-flow cart, do nothing. Never fail a
+// production build just because an earlier patch already applied the change.
+if (changed) {
+  fs.writeFileSync(file, source);
+  console.log('Sales cart converted to normal document flow above bottom navigation.');
+} else {
+  console.log('Sales cart position already uses normal document flow; no position patch needed.');
 }
-
-if (changed) console.log('Sales cart fixed directly above the mobile bottom navigation.');
-else console.log('Sales cart position already correct.');
 
 // Selected products must stay visible in the storefront so the cashier can
 // increase/decrease quantity or add more.
@@ -45,6 +42,7 @@ const badFilter = "p.quantity > 0 && !cart.some(line => line.productId === p.id)
 const goodFilter = "p.quantity > 0 && (category === 'All' || p.category === category) && `${p.name} ${p.brand} ${p.model} ${p.sku}`.toLowerCase().includes(search.toLowerCase())";
 if (source.includes(badFilter)) {
   source = source.replace(badFilter, goodFilter);
+  fs.writeFileSync(file, source);
   console.log('Selected products remain visible in the sales picker.');
 }
 
@@ -54,7 +52,6 @@ const oldHydration = "setProducts(readStore('keystone-products', seedProducts));
 const newHydration = "setProducts(readStore('keystone-products', seedProducts));\n      const persistedDraft = readStore<CartLine[]>('keystone-sale-draft', []);\n      setCart(prev => prev.length ? prev : persistedDraft);\n      setHydrating(false);";
 if (source.includes(oldHydration)) {
   source = source.replace(oldHydration, newHydration);
+  fs.writeFileSync(file, source);
   console.log('Sales cart hydration race fixed.');
 }
-
-fs.writeFileSync(file, source);
