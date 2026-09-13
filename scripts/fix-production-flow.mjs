@@ -40,7 +40,7 @@ replace(auth,
   'session non-blocking hydration');
 
 // Checkout writes sale, stock, customer and EMI data to Supabase. The database uses UUID primary
-// keys plus the browser-generated ids in client_id, so cloud-crud handles that translation.
+// keys plus browser-generated ids where supported; cloud-crud also supports older schemas.
 replace(checkout,
   "import { hydrateInventoryState, resetCloudHydration } from '@/lib/cloud-sync';",
   "import { hydrateInventoryState, resetCloudHydration } from '@/lib/cloud-sync';\nimport { cloudAdjustStock, cloudCreateEmiPlan, cloudCreateSale, cloudUpsertCustomer } from '@/lib/cloud-crud';",
@@ -53,11 +53,11 @@ replaceRegex(checkout,
 
 replace(checkout,
   "writeStore('keystone-sales',[sale,...readStore<Sale[]>('keystone-sales',[])]); writeStore('keystone-products',nextProducts); setProducts(nextProducts);",
-  "await cloudCreateSale(sale,cost,profit); await Promise.all(items.map(i=>cloudAdjustStock(i.productId,-i.quantity))); writeStore('keystone-sales',[sale,...readStore<Sale[]>('keystone-sales',[])]); writeStore('keystone-products',nextProducts); setProducts(nextProducts);",
+  "const dbSaleId=await cloudCreateSale(sale,cost,profit); await Promise.all(items.map(i=>cloudAdjustStock(i.productId,-i.quantity))); writeStore('keystone-sales',[sale,...readStore<Sale[]>('keystone-sales',[])]); writeStore('keystone-products',nextProducts); setProducts(nextProducts);",
   'checkout sale and stock cloud persistence');
 replace(checkout,
   "writeStore('keystone-emi-plans',[plan,...readStore<EmiPlan[]>('keystone-emi-plans',[])]); writeStore('keystone-emi-payments',[...payments,...readStore<EmiPayment[]>('keystone-emi-payments',[])]);",
-  "await cloudCreateEmiPlan(plan,payments); writeStore('keystone-emi-plans',[plan,...readStore<EmiPlan[]>('keystone-emi-plans',[])]); writeStore('keystone-emi-payments',[...payments,...readStore<EmiPayment[]>('keystone-emi-payments',[])]);",
+  "await cloudCreateEmiPlan(plan,payments,dbSaleId); writeStore('keystone-emi-plans',[plan,...readStore<EmiPlan[]>('keystone-emi-plans',[])]); writeStore('keystone-emi-payments',[...payments,...readStore<EmiPayment[]>('keystone-emi-payments',[])]);",
   'checkout EMI cloud persistence');
 
 console.log('Production flow patches applied: non-blocking startup hydration and durable Supabase sales/stock/customer/EMI checkout.');
