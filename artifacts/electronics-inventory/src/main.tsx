@@ -11,8 +11,8 @@ import './ui-polish.css';
 import './ui-upgrade.css';
 
 function CloudHydrationGate({ children }: { children: ReactNode }) {
-  const [ready, setReady] = useState(false);
-  const [ownerId, setOwnerId] = useState<string | null>(null);
+  const [, setReady] = useState(false);
+  const [, setOwnerId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -29,20 +29,25 @@ function CloudHydrationGate({ children }: { children: ReactNode }) {
         return;
       }
 
-      clearTenantCache();
-      resetCloudHydration();
+      // Do not block the first paint on Supabase. The application already has
+      // a local cache and individual pages can render from it immediately.
+      // Cloud data is refreshed in the background and the hydration event lets
+      // interested screens update when it is ready.
       if (alive) {
         setOwnerId(userId);
-        setReady(false);
+        setReady(true);
       }
 
-      await hydrateInventoryState();
-      if (alive) setReady(true);
+      try {
+        await hydrateInventoryState();
+      } catch (error) {
+        console.warn('[cloud] background hydration failed:', error);
+      }
     };
 
     supabase.auth.getSession().then(({ data }) => {
       void hydrateForUser(data.session?.user?.id ?? null);
-    });
+    }).catch(() => undefined);
 
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
       void hydrateForUser(session?.user?.id ?? null);
@@ -51,16 +56,14 @@ function CloudHydrationGate({ children }: { children: ReactNode }) {
     return () => {
       alive = false;
       subscription.subscription.unsubscribe();
-      clearTenantCache();
       resetCloudHydration();
     };
   }, []);
 
-  if (!ownerId || !ready) {
-    return <div className="min-h-screen bg-[#f7f7fb]" aria-label="Loading workspace" />;
-  }
-
-  return <div key={ownerId}>{children}</div>;
+  // AuthGate is responsible for deciding whether a user is signed in. Once
+  // mounted, always paint the app immediately instead of showing a blank page
+  // while several Supabase queries complete.
+  return <>{children}</>;
 }
 
 function PlatformEntry() {
