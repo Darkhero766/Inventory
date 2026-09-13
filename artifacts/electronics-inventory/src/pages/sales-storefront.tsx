@@ -49,9 +49,10 @@ export default function SalesStorefront() {
   }));
   const remove = (id: string) => setCart(prev => prev.filter(x => x.productId !== id));
 
-  // Sticky inside the scrolling sales content: it floats above the fixed tab bar
-  // while scrolling, but remains part of document flow and releases at the end.
-  const cartBar = count > 0 ? <div className="sticky bottom-24 z-30 mx-auto mt-5 w-full max-w-3xl pb-2">
+  // Deliberately normal document flow. The cart sits after the product list,
+  // so it scrolls naturally with the page instead of being fixed/sticky to
+  // the viewport. Extra bottom space keeps it clear of the fixed tab bar.
+  const cartBar = count > 0 ? <div className="relative z-20 mx-auto mt-5 mb-6 w-full max-w-3xl">
     <div className="rounded-3xl border border-white/10 bg-[hsl(var(--primary))] p-3 text-[hsl(var(--primary-foreground))] shadow-2xl shadow-black/20 ring-1 ring-black/5 backdrop-blur-xl">
       <div className="flex items-center gap-3">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/15"><ShoppingCart className="h-5 w-5"/></div>
@@ -62,7 +63,7 @@ export default function SalesStorefront() {
     </div>
   </div> : null;
 
-  return <div className="mx-auto max-w-6xl pb-28 fade-up">
+  return <div className="mx-auto max-w-6xl pb-40 fade-up">
     <div className="mb-5 flex items-end justify-between gap-3">
       <div><p className="font-mono text-[10px] uppercase tracking-[.2em] text-[hsl(var(--muted-foreground))]">Point of sale</p><h1 className="mt-1 text-3xl font-extrabold tracking-[-.055em]">Choose products</h1><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Add multiple products, then review everything on one checkout page.</p></div>
       <div className="hidden rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-2 text-right sm:block"><p className="text-[10px] text-[hsl(var(--muted-foreground))]">Inventory</p><b className="text-sm">{products.length} products</b></div>
