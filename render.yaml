@@ -4,6 +4,7 @@ services:
     runtime: static
     buildCommand: npm run build
     staticPublishPath: artifacts/electronics-inventory/dist/public
+    autoDeployTrigger: commit
     routes:
       - type: rewrite
         source: /*
