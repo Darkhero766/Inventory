@@ -49,5 +49,13 @@ source = source.replace(
   "}catch(e){console.error('[sales] checkout failed',e);setError(e instanceof Error?e.message:'Sale could not be completed.') }"
 );
 
+// Some existing Supabase databases still have the legacy lowercase sales status
+// constraint. The migration supports both spellings, but using the legacy spelling
+// first also keeps checkout working before the migration has been applied.
+const crudFile = 'artifacts/electronics-inventory/src/lib/cloud-crud.ts';
+let crud = fs.readFileSync(crudFile, 'utf8');
+crud = crud.replace("payment_method, status: 'COMPLETED'", "payment_method, status: 'completed'");
+fs.writeFileSync(crudFile, crud);
+
 fs.writeFileSync(file, source);
-console.log('EMI checkout persistence and UUID generation patched.');
+console.log('EMI checkout persistence, UUID generation, and legacy sales-status compatibility patched.');
