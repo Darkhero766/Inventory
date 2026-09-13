@@ -3,13 +3,12 @@ import fs from 'node:fs';
 const file = 'artifacts/electronics-inventory/src/pages/sales-storefront.tsx';
 let source = fs.readFileSync(file, 'utf8');
 
-// The cart is intentionally part of the document flow. It appears after the
-// product list, immediately above the app's fixed bottom navigation, and moves
-// away naturally when the cashier scrolls. Do not portal it to document.body
-// and do not use fixed/sticky positioning here.
-const normalFlow = 'className="mx-auto mt-5 w-full max-w-3xl pb-1"';
+// The sales cart must stay visible while the cashier scrolls. It is a fixed
+// floating bar positioned directly above the mobile bottom navigation.
+// Keep it out of document flow so it never gets buried below the product list.
+const fixedFlow = 'className="fixed left-1/2 z-40 w-[calc(100%-24px)] max-w-3xl -translate-x-1/2 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))]/95 p-2 shadow-2xl backdrop-blur-xl" style={{bottom:\'calc(76px + env(safe-area-inset-bottom) + 10px)\'}}';
 const patterns = [
-  /className="fixed[^\"]*max-w-3xl[^\"]*"/,
+  /className="fixed[^\"]*max-w-3xl[^\"]*"(?:\s+style=\{\{[^}]*\}\})?/,
   /className="sticky[^\"]*max-w-3xl[^\"]*"/,
   /className="relative[^\"]*max-w-3xl[^\"]*"/,
   /className="mx-auto mt-5 w-full max-w-3xl pb-1"/,
@@ -17,15 +16,15 @@ const patterns = [
 
 let changed = false;
 for (const pattern of patterns) {
-  if (pattern.test(source) && !pattern.test(normalFlow)) {
-    source = source.replace(pattern, normalFlow);
+  if (pattern.test(source)) {
+    source = source.replace(pattern, fixedFlow);
     changed = true;
     break;
   }
 }
 
-// Older builds rendered the cart through a portal, which made it independent
-// of page scrolling. Remove that portal so the cart stays in normal flow.
+// Older builds rendered the cart through a portal. Keep the cart in the page
+// component and use fixed positioning so it remains anchored to the viewport.
 if (source.includes("import { createPortal } from 'react-dom';")) {
   source = source.replace("import { createPortal } from 'react-dom';\n", '');
   changed = true;
@@ -55,4 +54,4 @@ if (source.includes(oldHydration)) {
 }
 
 fs.writeFileSync(file, source);
-console.log(changed ? 'Sales cart position normalized to document flow above bottom navigation.' : 'Sales cart already uses normal document flow.');
+console.log(changed ? 'Sales cart fixed above mobile bottom navigation.' : 'Sales cart already uses fixed viewport positioning.');
