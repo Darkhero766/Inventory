@@ -46,31 +46,40 @@ export default function SalesCheckoutPage(){
   setError('');
   if(!items.length){setError('Add at least one product before completing the sale.');return}
   if(payment!=='EMI'&&received+0.001<total){setError(`Payment received must be at least ${money(total)}.`);return}
-  const dp=Math.max(0,Number(downPayment)||0);
-  if(payment==='EMI'&&(dp>total||Number(months)<1||Number(interestRate)<0)){setError('Check EMI down payment, tenure and interest rate.');return}
-  if(payment==='EMI'&&!customerId&&!customerPhone.trim()){setError('EMI sales require a customer name and mobile number.');return}
+  const dp=Math.max(0,Number(downPayment)||0); const n=Math.max(1,Math.floor(Number(months)||1)); const rate=Math.max(0,Number(interestRate)||0);
+  if(payment==='EMI'&&(dp>total||!Number.isFinite(dp)||!Number.isFinite(Number(months))||Number(months)<1||!Number.isFinite(rate))){setError('Check EMI down payment, tenure and interest rate.');return}
+  if(payment==='EMI'&&!customerId&&(!customerName.trim()||!customerPhone.trim())){setError('EMI sales require a customer name and mobile number.');return}
+  if(payment==='EMI'&&(!firstDue||Number.isNaN(new Date(`${firstDue}T00:00:00`).getTime()))){setError('Choose a valid first EMI due date.');return}
   if(items.some(i=>i.quantity>i.product.quantity)){setError('Stock changed. Refresh the sale and try again.');return}
   setBusy(true);
   try{
    let cid=customerId;
+   const rawCustomers=readStore<Customer[]>('keystone-customers',[]); const customerList=Array.isArray(rawCustomers)?rawCustomers:[];
    if(!cid&&customerName.trim()&&customerPhone.trim()){
-    const existing=customers.find(c=>c.phone.trim()===customerPhone.trim());
+    const phone=customerPhone.trim(); const existing=customerList.find(c=>c.phone.trim()===phone);
     if(existing)cid=existing.id;
-    else{cid=`cus-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;const c={id:cid,name:customerName.trim(),phone:customerPhone.trim(),createdAt:new Date().toISOString()} as Customer;const next=[c,...customers];setCustomers(next);writeStore('keystone-customers',next)}
+    else{cid=`cus-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;const c={id:cid,name:customerName.trim(),phone,createdAt:new Date().toISOString()} as Customer;const next=[c,...customerList];setCustomers(next);writeStore('keystone-customers',next)}
    }
+   if(payment==='EMI'&&!cid)throw new Error('EMI customer could not be resolved. Select an existing customer or enter both name and mobile number.');
    const saleId=`sale-${Date.now()}-${Math.random().toString(36).slice(2,7)}`; const date=new Date().toISOString(); const invoiceNo=`INV-${new Date().getFullYear()}-${String(Date.now()).slice(-7)}`;
-   const sale:Sale={id:saleId,date,invoice:invoiceNo,customerId:cid||undefined,customerName:customerName.trim()||customers.find(c=>c.id===cid)?.name,items:items.map(i=>({productId:i.productId,productName:i.product.name,quantity:i.quantity,price:i.product.sellingPrice,discount:discount*(i.product.sellingPrice*i.quantity/Math.max(subtotal,1)),serialNumber:i.product.serialNumber,imei:i.product.imei})),subtotal,discount,total,payment,purchaseCost:cost,profit,status:'COMPLETED',discountType,discountValue:Number(discountValue)||0};
+   const sale:Sale={id:saleId,date,invoice:invoiceNo,customerId:cid||undefined,customerName:customerName.trim()||customerList.find(c=>c.id===cid)?.name,items:items.map(i=>({productId:i.productId,productName:i.product.name,quantity:i.quantity,price:i.product.sellingPrice,discount:discount*(i.product.sellingPrice*i.quantity/Math.max(subtotal,1)),serialNumber:i.product.serialNumber,imei:i.product.imei})),subtotal,discount,total,payment,purchaseCost:cost,profit,status:'COMPLETED',discountType,discountValue:Number(discountValue)||0};
    const nextProducts=products.map(p=>{const line=items.find(i=>i.productId===p.id);return line?{...p,quantity:p.quantity-line.quantity}:p});
-   writeStore('keystone-sales',[sale,...readStore<Sale[]>('keystone-sales',[])]); writeStore('keystone-products',nextProducts); setProducts(nextProducts);
-   if(payment==='EMI'&&cid){
-    const n=Math.max(1,Math.floor(Number(months)||1)); const financed=principal; const emiAmount=Number(calc.emi.toFixed(2)); const planId=`emi-${Date.now()}-${Math.random().toString(36).slice(2,7)}`; const start=new Date(`${firstDue}T00:00:00`); const payments:EmiPayment[]=[];
+   const rawSales=readStore<Sale[]>('keystone-sales',[]); const salesList=Array.isArray(rawSales)?rawSales:[];
+   writeStore('keystone-sales',[sale,...salesList]); writeStore('keystone-products',nextProducts); setProducts(nextProducts);
+   if(payment==='EMI'){
+    const financed=principal; const emiAmount=Number(calc.emi.toFixed(2)); const planId=`emi-${Date.now()}-${Math.random().toString(36).slice(2,7)}`; const start=new Date(`${firstDue}T00:00:00`); const payments:EmiPayment[]=[];
     for(let i=1;i<=n;i++){const due=new Date(start);due.setMonth(due.getMonth()+i-1);const amount=i===n?Number((calc.total-emiAmount*(n-1)).toFixed(2)):emiAmount;payments.push({id:`emip-${Date.now()}-${i}-${Math.random().toString(36).slice(2,5)}`,emiPlanId:planId,installmentNumber:i,dueDate:due.toISOString(),amount,status:'UPCOMING'})}
     const end=payments[n-1]?.dueDate||start.toISOString();
-    const plan={id:planId,saleId,customerId:cid,totalAmount:total,downPayment:dp,financedAmount:financed,emiAmount,installments:n,paidInstallments:0,outstandingAmount:calc.total,nextDueDate:payments[0]?.dueDate||null,startDate:firstDue,endDate:end,frequency:'MONTHLY',status:financed>0?'ACTIVE':'PAID',interestRate:Math.max(0,Number(interestRate)||0),totalInterest:calc.interest} as EmiPlan & {interestRate:number;totalInterest:number};
-    writeStore('keystone-emi-plans',[plan,...readStore<EmiPlan[]>('keystone-emi-plans',[])]); writeStore('keystone-emi-payments',[...payments,...readStore<EmiPayment[]>('keystone-emi-payments',[])]);
+    const plan={id:planId,saleId,customerId:cid!,totalAmount:total,downPayment:dp,financedAmount:financed,emiAmount,installments:n,paidInstallments:0,outstandingAmount:calc.total,nextDueDate:payments[0]?.dueDate||null,startDate:firstDue,endDate:end,frequency:'MONTHLY',status:financed>0?'ACTIVE':'PAID',interestRate:rate,totalInterest:calc.interest} as EmiPlan & {interestRate:number;totalInterest:number};
+    const rawPlans=readStore<EmiPlan[]>('keystone-emi-plans',[]); const rawPayments=readStore<EmiPayment[]>('keystone-emi-payments',[]); const planList=Array.isArray(rawPlans)?rawPlans:[]; const paymentList=Array.isArray(rawPayments)?rawPayments:[];
+    writeStore('keystone-emi-plans',[plan,...planList]); writeStore('keystone-emi-payments',[...payments,...paymentList]);
    }
    setInvoice(sale);setCart([]);writeStore('keystone-sale-draft',[]);resetCloudHydration();
-  }catch(e){setError(e instanceof Error?e.message:'Sale could not be completed.')}finally{setBusy(false)}
+  }catch(e){
+   const detail=e instanceof Error?e.message:String(e??'Unknown error');
+   console.error('[checkout] sale completion failed',e);
+   setError(detail||'Sale could not be completed.');
+  }finally{setBusy(false)}
  };
  if(invoice)return <div className="mx-auto max-w-2xl py-8 fade-up"><div className="overflow-hidden rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-xl"><div className="bg-[hsl(var(--primary))] p-7 text-[hsl(var(--primary-foreground))]"><div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10"><Check/></div><p className="font-mono text-[10px] uppercase tracking-[.2em] opacity-60">Sale completed</p><h1 className="mt-2 text-3xl font-extrabold">{invoice.invoice}</h1><p className="mt-1 text-sm opacity-70">{invoice.customerName||'Walk-in customer'} · {money(invoice.total)}</p></div><div className="space-y-3 p-6">{invoice.items.map(i=><div key={i.productId} className="flex justify-between border-b border-[hsl(var(--border))] pb-3 text-sm"><span>{i.productName} × {i.quantity}</span><b>{money(i.price*i.quantity)}</b></div>)}<div className="flex justify-between pt-2 text-lg font-extrabold"><span>Total</span><span>{money(invoice.total)}</span></div><div className="grid grid-cols-2 gap-3 pt-3"><Link href="/sales" className={button}>New sale</Link><button className="inline-flex items-center justify-center gap-2 rounded-xl border border-[hsl(var(--border))] px-4 py-2.5 text-sm font-bold" onClick={()=>setLocation('/sales')}>Back to sales</button></div></div></div></div>;
  return <div className="mx-auto max-w-7xl pb-28 fade-up">
