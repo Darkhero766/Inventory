@@ -5,6 +5,8 @@ const OWNER_KEY = 'keystone-active-owner-id-v1';
 let hydrating = false;
 let bootPromise: Promise<boolean> | null = null;
 let cloudReady = false;
+let syncTimer: ReturnType<typeof setTimeout> | null = null;
+let syncChain: Promise<void> = Promise.resolve();
 
 const clearLocalInventoryCache = () => { for (const key of KEYS) localStorage.removeItem(key); };
 const notifyHydrated = () => { if (typeof window !== 'undefined') window.dispatchEvent(new Event('keystone-inventory-hydrated')); };
@@ -36,11 +38,29 @@ async function hydrateRelational() {
   localStorage.setItem('keystone-products',JSON.stringify(products)); localStorage.setItem('keystone-customers',JSON.stringify(customers)); localStorage.setItem('keystone-sales',JSON.stringify(sales)); localStorage.setItem('keystone-emi-plans',JSON.stringify(emiPlans)); localStorage.setItem('keystone-emi-payments',JSON.stringify(emiPayments)); return true;
 }
 
+async function syncSnapshot() {
+  const client = supabase;
+  if (!client || typeof window === 'undefined' || hydrating || !(await ensureSession())) return;
+  const state: Record<string, unknown> = {};
+  for (const key of KEYS) {
+    try { state[key] = JSON.parse(localStorage.getItem(key) ?? '[]'); } catch { state[key] = []; }
+  }
+  const { error } = await client.rpc('sync_inventory_snapshot', { p_state: state });
+  if (error) console.warn('[cloud] snapshot sync failed:', error.message);
+}
+
 export async function hydrateInventoryState() {
   const client = supabase; if (!client || typeof window === 'undefined') return false; if (bootPromise) return bootPromise;
-  bootPromise = (async () => { if (!(await ensureSession())) return false; hydrating = true; cloudReady = false; try { const ownerId = await currentUserId(); if (!ownerId) return false; const cachedOwner = localStorage.getItem(OWNER_KEY); if (cachedOwner !== ownerId) clearLocalInventoryCache(); localStorage.setItem(OWNER_KEY, ownerId); const loaded = await hydrateRelational(); cloudReady = true; notifyHydrated(); return loaded; } finally { hydrating = false; } })(); return bootPromise;
+  bootPromise = (async () => { if (!(await ensureSession())) return false; hydrating = true; cloudReady = false; try { const ownerId = await currentUserId(); if (!ownerId) return false; const cachedOwner = localStorage.getItem(OWNER_KEY); if (cachedOwner !== ownerId) clearLocalInventoryCache(); localStorage.setItem(OWNER_KEY, ownerId); const loaded = await hydrateRelational(); cloudReady = loaded; notifyHydrated(); return loaded; } finally { hydrating = false; } })(); return bootPromise;
 }
-export function resetCloudHydration() { bootPromise = null; cloudReady = false; }
+export function resetCloudHydration() { bootPromise = null; }
 export function clearTenantCache() { clearLocalInventoryCache(); localStorage.removeItem(OWNER_KEY); resetCloudHydration(); }
-export function syncInventoryState() { if (!cloudReady || hydrating) return; }
+export function syncInventoryState() {
+  if (!supabase || typeof window === 'undefined' || hydrating) return;
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => {
+    syncTimer = null;
+    syncChain = syncChain.then(() => syncSnapshot()).catch(error => console.warn('[cloud] snapshot sync queue failed:', error));
+  }, 350);
+}
 export const cloudSyncConfigured = () => Boolean(supabase);
