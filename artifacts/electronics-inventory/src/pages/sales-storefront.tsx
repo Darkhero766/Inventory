@@ -49,7 +49,7 @@ export default function SalesStorefront() {
   }));
   const remove = (id: string) => setCart(prev => prev.filter(x => x.productId !== id));
 
-  return <div className="mx-auto max-w-6xl pb-10 fade-up">
+  return <div className="mx-auto max-w-6xl pb-2 fade-up">
     <div className="mb-5 flex items-end justify-between gap-3">
       <div><p className="font-mono text-[10px] uppercase tracking-[.2em] text-[hsl(var(--muted-foreground))]">Point of sale</p><h1 className="mt-1 text-3xl font-extrabold tracking-[-.055em]">Choose products</h1><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Add multiple products, then review everything on one checkout page.</p></div>
       <div className="hidden rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-2 text-right sm:block"><p className="text-[10px] text-[hsl(var(--muted-foreground))]">Inventory</p><b className="text-sm">{products.length} products</b></div>
@@ -66,9 +66,8 @@ export default function SalesStorefront() {
       })}
     </div> : <div className="rounded-3xl border border-dashed p-12 text-center"><ShoppingCart className="mx-auto mb-3 h-8 w-8 text-[hsl(var(--muted-foreground))]"/><b>No products found</b><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Try another search or category.</p></div>}
 
-    {/* Cart summary intentionally stays in normal document flow. The mobile nav is fixed by InventoryShell, so this bar must never be fixed to the viewport. */}
-    {count > 0 && <div className="relative z-10 mx-auto mt-6 mb-24 w-full max-w-3xl">
-      <div className="rounded-3xl border border-white/10 bg-[hsl(var(--primary))] p-3 text-[hsl(var(--primary-foreground))] shadow-2xl shadow-black/25 ring-1 ring-black/5">
+    {count > 0 && <div className="sticky bottom-[88px] z-20 mx-auto mt-5 w-full max-w-3xl px-0.5 pb-1">
+      <div className="rounded-3xl border border-white/10 bg-[hsl(var(--primary))] p-3 text-[hsl(var(--primary-foreground))] shadow-2xl shadow-black/30 ring-1 ring-black/5 backdrop-blur-xl">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/15"><ShoppingCart className="h-5 w-5"/></div>
           <div className="min-w-0 flex-1"><p className="text-[10px] font-semibold uppercase tracking-[.15em] opacity-60">Current cart</p><p className="truncate text-sm font-extrabold">{count} {count === 1 ? 'item' : 'items'} · {money(total)}</p></div>
