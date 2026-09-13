@@ -36,33 +36,34 @@ if (!source.includes('await cloudUpsertCustomer(c)')) {
   }
 }
 
-// Persist the sale and stock changes from checkout. This is intentionally
-// idempotent so the build script can safely run on every deployment.
-if (!source.includes('await cloudCreateSale(sale,cost,profit)')) {
+// Persist the sale and stock changes from checkout. Capture the real database
+// UUID returned by Supabase so EMI creation never has to guess/lookup by a
+// browser client ID.
+if (!source.includes('const dbSaleId=await cloudCreateSale(sale,cost,profit)')) {
   const saleAnchor = "const nextProducts=products.map(p=>{const line=items.find(i=>i.productId===p.id);return line?{...p,quantity:p.quantity-line.quantity}:p});";
   if (!source.includes(saleAnchor)) throw new Error('EMI sale persistence anchor not found.');
   source = source.replace(
     saleAnchor,
-    `${saleAnchor}\n   await cloudCreateSale(sale,cost,profit);\n   for(const i of items) await cloudAdjustStock(i.productId,-i.quantity);`
+    `${saleAnchor}\n   const dbSaleId=await cloudCreateSale(sale,cost,profit);\n   for(const i of items) await cloudAdjustStock(i.productId,-i.quantity);`
   );
 }
 
 // The checkout source has changed shape over time. Do not depend on one exact
 // generated line for the EMI plan. Find the plan declaration and inject the
 // cloud persistence call immediately after it.
-if (!source.includes('await cloudCreateEmiPlan(plan,payments)')) {
+if (!source.includes('await cloudCreateEmiPlan(plan,payments,dbSaleId)')) {
   const exactPlan = "const plan={id:planId,saleId,customerId:cid!,totalAmount:total,downPayment:dp,financedAmount:financed,emiAmount,installments:n,paidInstallments:0,outstandingAmount:calc.total,nextDueDate:payments[0]?.dueDate||null,startDate:firstDue,endDate:end,frequency:'MONTHLY',status:financed>0?'ACTIVE':'PAID',interestRate:rate,totalInterest:calc.interest} as EmiPlan & {interestRate:number;totalInterest:number};";
   const previousPlan = "const plan={id:planId,saleId,customerId:cid,totalAmount:total,downPayment:dp,financedAmount:financed,emiAmount,installments:n,paidInstallments:0,outstandingAmount:calc.total,nextDueDate:payments[0]?.dueDate||null,startDate:firstDue,endDate:end,frequency:'MONTHLY',status:financed>0?'ACTIVE':'PAID',interestRate:Math.max(0,Number(interestRate)||0),totalInterest:calc.interest} as EmiPlan & {interestRate:number;totalInterest:number};";
   if (source.includes(exactPlan)) {
-    source = source.replace(exactPlan, `${exactPlan}\n    await cloudCreateEmiPlan(plan,payments);`);
+    source = source.replace(exactPlan, `${exactPlan}\n    await cloudCreateEmiPlan(plan,payments,dbSaleId);`);
   } else if (source.includes(previousPlan)) {
-    source = source.replace(previousPlan, `${previousPlan}\n    await cloudCreateEmiPlan(plan,payments);`);
+    source = source.replace(previousPlan, `${previousPlan}\n    await cloudCreateEmiPlan(plan,payments,dbSaleId);`);
   } else {
     const planStart = source.indexOf('const plan={id:planId');
     if (planStart < 0) throw new Error('EMI plan declaration not found.');
     const planEnd = source.indexOf('\n', planStart);
     if (planEnd < 0) throw new Error('EMI plan declaration end not found.');
-    source = source.slice(0, planEnd + 1) + '    await cloudCreateEmiPlan(plan,payments);\n' + source.slice(planEnd + 1);
+    source = source.slice(0, planEnd + 1) + '    await cloudCreateEmiPlan(plan,payments,dbSaleId);\n' + source.slice(planEnd + 1);
   }
 }
 
