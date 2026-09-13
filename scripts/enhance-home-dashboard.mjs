@@ -14,9 +14,7 @@ const home = String.raw`function HomePage(){
   const low=products.filter(p=>statusOf(p)==='LOW STOCK');
   const out=products.filter(p=>statusOf(p)==='OUT OF STOCK');
   const recent=[...products].sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,5);
-  const filtered=search?products.filter(p=>
-    `${p.name} ${p.brand} ${p.sku}`.toLowerCase().includes(search.toLowerCase())
-  ):[];
+  const filtered=search?products.filter(p=>(p.name+' '+p.brand+' '+p.sku).toLowerCase().includes(search.toLowerCase())):[];
   const stockValue=products.reduce((s,p)=>s+p.quantity*p.purchasePrice,0);
   const totalSales=sales.reduce((s,x)=>s+x.total,0);
   const totalProfit=sales.reduce((s,x)=>s+(x.profit??0),0);
@@ -26,7 +24,7 @@ const home = String.raw`function HomePage(){
   const todayRevenue=todaySales.reduce((s,x)=>s+x.total,0);
   const todayProfit=todaySales.reduce((s,x)=>s+(x.profit??0),0);
   const overdue=emiPlans.filter(e=>e.outstandingAmount>0&&(e.status==='OVERDUE'||(e.nextDueDate&&new Date(e.nextDueDate)<new Date()))).length;
-  const compact=(v:number)=>v>=100000?`₹${(v/100000).toFixed(1)}L`:v>=1000?`₹${(v/1000).toFixed(1)}K`:moneyValue(v);
+  const compact=(v:number)=>v>=100000?'₹'+(v/100000).toFixed(1)+'L':v>=1000?'₹'+(v/1000).toFixed(1)+'K':moneyValue(v);
   const hour=new Date().getHours();
   const greeting=hour<12?'Good morning':hour<18?'Good afternoon':'Good evening';
   const todayLabel=new Intl.DateTimeFormat('en-IN',{weekday:'long',day:'numeric',month:'short'}).format(new Date());
@@ -117,9 +115,9 @@ const home = String.raw`function HomePage(){
             <p className="text-sm font-extrabold">Needs attention</p>
             <p className="mt-1 text-[11px] leading-relaxed text-[hsl(var(--muted-foreground))]">
               {[
-                out.length>0?`${out.length} out of stock`:null,
-                low.length>0?`${low.length} low stock`:null,
-                overdue>0?`${overdue} overdue EMI`:null,
+                out.length>0?out.length+' out of stock':null,
+                low.length>0?low.length+' low stock':null,
+                overdue>0?overdue+' overdue EMI':null,
               ].filter(Boolean).join(' · ')}
             </p>
           </div>
