@@ -49,7 +49,9 @@ export default function SalesStorefront() {
   }));
   const remove = (id: string) => setCart(prev => prev.filter(x => x.productId !== id));
 
-  // Mobile nav is fixed at 76px. Stack the cart immediately above it.
+  // Keep the cart as a viewport overlay, stacked above the 76px mobile nav.
+  // It intentionally does not live in normal document flow, so it remains
+  // visible while the product list scrolls.
   const cartBar = count > 0 ? <div className="fixed bottom-[76px] left-3 right-3 z-40 sm:left-5 sm:right-5 md:bottom-5 md:left-auto md:right-5 md:w-[min(680px,calc(100vw-40px))]">
     <div className="rounded-3xl border border-white/10 bg-[hsl(var(--primary))] p-3 text-[hsl(var(--primary-foreground))] shadow-2xl shadow-black/25 ring-1 ring-black/5 backdrop-blur-xl">
       <div className="flex items-center gap-3">
@@ -61,7 +63,7 @@ export default function SalesStorefront() {
     </div>
   </div> : null;
 
-  return <div className="mx-auto max-w-6xl pb-[190px] fade-up">
+  return <div className="mx-auto max-w-6xl pb-[190px]">
     <div className="mb-5 flex items-end justify-between gap-3">
       <div><p className="font-mono text-[10px] uppercase tracking-[.2em] text-[hsl(var(--muted-foreground))]">Point of sale</p><h1 className="mt-1 text-3xl font-extrabold tracking-[-.055em]">Choose products</h1><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Add multiple products, then review everything on one checkout page.</p></div>
       <div className="hidden rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-2 text-right sm:block"><p className="text-[10px] text-[hsl(var(--muted-foreground))]">Inventory</p><b className="text-sm">{products.length} products</b></div>
