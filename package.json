@@ -6,7 +6,7 @@
   "packageManager": "pnpm@10.15.0",
   "engines": { "node": ">=20 <25" },
   "scripts": {
-    "build": "node scripts/prepare-inventory-build.mjs && node scripts/fix-production-flow.mjs && node scripts/ensure-sales-storefront.mjs && node scripts/fix-sales-cart-position.mjs && node scripts/fix-emi-sale-runtime.mjs && corepack pnpm install --no-frozen-lockfile && corepack pnpm run typecheck && corepack pnpm exec vite build --config artifacts/electronics-inventory/vite.config.ts",
+    "build": "node scripts/normalize-dependencies.mjs && node scripts/prepare-inventory-build.mjs && node scripts/fix-production-flow.mjs && node scripts/ensure-sales-storefront.mjs && node scripts/fix-sales-cart-position.mjs && node scripts/fix-emi-sale-runtime.mjs && corepack pnpm install --no-frozen-lockfile && corepack pnpm run typecheck && corepack pnpm exec vite build --config artifacts/electronics-inventory/vite.config.ts",
     "typecheck": "corepack pnpm exec tsc -p artifacts/electronics-inventory/tsconfig.json --noEmit",
     "dev": "corepack pnpm exec vite --config artifacts/electronics-inventory/vite.config.ts --host 0.0.0.0",
     "preview": "corepack pnpm exec vite preview --config artifacts/electronics-inventory/vite.config.ts --host 0.0.0.0"
@@ -22,7 +22,7 @@
     "@radix-ui/react-context-menu": "^2.2.7",
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-dropdown-menu": "^2.1.15",
-    "@radix-ui/react-hover-card": "^1.1.14",
+    "@radix-ui/react-hover-card": "^1.1.23",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-menubar": "^1.1.24",
     "@radix-ui/react-navigation-menu": "^1.2.13",
