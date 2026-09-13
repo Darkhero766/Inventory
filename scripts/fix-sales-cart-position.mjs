@@ -3,10 +3,9 @@ import fs from 'node:fs';
 const file = 'artifacts/electronics-inventory/src/pages/sales-storefront.tsx';
 let source = fs.readFileSync(file, 'utf8');
 
-// The sales cart must be part of the document flow. It should sit naturally
-// above the fixed mobile navigation, but it must scroll away with the product
-// list instead of sticking to the viewport.
-const replacement = 'className="relative z-20 mx-auto mt-6 mb-24 w-full max-w-3xl"';
+// The cart is a viewport-level action bar on mobile. It must sit above the
+// fixed 76px bottom navigation rather than scrolling with the product list.
+const replacement = 'className="fixed inset-x-3 bottom-[84px] z-40 mx-auto w-[calc(100%-0px)] max-w-3xl pb-1 md:bottom-6 md:left-auto md:right-6 md:inset-x-auto md:w-auto"';
 const patterns = [
   /className="sticky bottom-\[88px\] z-20 mx-auto mt-5 w-full max-w-3xl px-0\.5 pb-1"/,
   /className="sticky bottom-\[[^\]]+\] z-20 mx-auto[^\"]*max-w-3xl[^\"]*"/,
@@ -27,13 +26,11 @@ for (const pattern of patterns) {
   }
 }
 
-// If the storefront already has a normal-flow cart, do nothing. Never fail a
-// production build just because an earlier patch already applied the change.
 if (changed) {
   fs.writeFileSync(file, source);
-  console.log('Sales cart converted to normal document flow above bottom navigation.');
+  console.log('Sales cart fixed above the mobile bottom navigation.');
 } else {
-  console.log('Sales cart position already uses normal document flow; no position patch needed.');
+  console.log('Sales cart position already patched; no position change needed.');
 }
 
 // Selected products must stay visible in the storefront so the cashier can
