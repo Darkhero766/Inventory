@@ -3,10 +3,11 @@ import fs from 'node:fs';
 const file = 'artifacts/electronics-inventory/src/pages/sales-storefront.tsx';
 let source = fs.readFileSync(file, 'utf8');
 
-// The cart is a viewport-level action bar on mobile. It must stay visible while
-// the product list scrolls and sit directly above the fixed bottom navigation.
-// On desktop it returns to normal document flow.
-const fixedClass = 'className="fixed inset-x-3 bottom-[88px] z-40 mx-auto w-auto max-w-3xl md:relative md:inset-auto md:mx-auto md:mt-6 md:mb-6 md:w-full"';
+// The mobile bottom navigation in InventoryShell is already viewport-fixed.
+// The cart summary therefore belongs in normal document flow: it scrolls with
+// the product list and ends naturally above the navigation instead of floating
+// over products or the navigation.
+const flowClass = 'className="relative z-10 mx-auto mt-6 mb-24 w-full max-w-3xl"';
 
 const positionPatterns = [
   /className="relative z-20 mx-auto mt-6 mb-28 w-full max-w-3xl"/,
@@ -15,23 +16,22 @@ const positionPatterns = [
   /className="fixed bottom-20 left-1\/2 z-40 w-\[calc\(100%-24px\)\] max-w-2xl -translate-x-1\/2 rounded-2xl[^\"]*"/,
   /className="fixed bottom-20[^\"]*max-w-2xl[^\"]*"/,
   /className="fixed inset-x-3 bottom-\[88px\] z-40[^\"]*"/,
+  /className="fixed inset-x-3 bottom-20 z-40[^\"]*"/,
 ];
 
 let changed = false;
 for (const pattern of positionPatterns) {
   if (pattern.test(source)) {
-    source = source.replace(pattern, fixedClass);
+    source = source.replace(pattern, flowClass);
     changed = true;
     break;
   }
 }
 
 if (!changed) {
-  // If the cart is already correctly positioned, leave it untouched. This
-  // keeps the build patch idempotent and avoids rewriting unrelated code.
-  console.log('Sales cart already uses the mobile floating position.');
+  console.log('Sales cart already uses normal document flow.');
 } else {
-  console.log('Sales cart fixed above the mobile bottom navigation.');
+  console.log('Sales cart converted to normal document flow above mobile navigation.');
 }
 
 // Selected products must stay visible in the storefront so the cashier can
