@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowRight, Minus, Plus, Search, ShoppingCart, Trash2 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { Product, readStore, seedProducts, writeStore } from '@/lib/inventory';
@@ -49,6 +50,17 @@ export default function SalesStorefront() {
   }));
   const remove = (id: string) => setCart(prev => prev.filter(x => x.productId !== id));
 
+  const cartBar = count > 0 ? <div className="fixed !bottom-[calc(70px+env(safe-area-inset-bottom)+12px)] left-3 right-3 z-[60] mx-auto w-auto max-w-3xl md:!bottom-6 md:left-auto md:right-6 md:inset-x-auto md:w-auto">
+    <div className="rounded-3xl border border-white/10 bg-[hsl(var(--primary))] p-3 text-[hsl(var(--primary-foreground))] shadow-2xl shadow-black/30 ring-1 ring-black/5 backdrop-blur-xl">
+      <div className="flex items-center gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/15"><ShoppingCart className="h-5 w-5"/></div>
+        <div className="min-w-0 flex-1"><p className="text-[10px] font-semibold uppercase tracking-[.15em] opacity-60">Current cart</p><p className="truncate text-sm font-extrabold">{count} {count === 1 ? 'item' : 'items'} · {money(total)}</p></div>
+        <div className="hidden max-w-[250px] items-center gap-1 sm:flex">{cartItems.slice(0, 2).map(x => <span key={x.productId} className="rounded-full bg-white/10 px-2 py-1 text-[10px]">{x.product?.name} ×{x.quantity}</span>)}</div>
+        <button onClick={() => setLocation('/sales/checkout')} className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-white px-4 py-3 text-xs font-extrabold text-[hsl(var(--primary))] shadow-lg">Review & checkout <ArrowRight className="h-4 w-4"/></button>
+      </div>
+    </div>
+  </div> : null;
+
   return <div className="mx-auto max-w-6xl pb-44 fade-up md:pb-2">
     <div className="mb-5 flex items-end justify-between gap-3">
       <div><p className="font-mono text-[10px] uppercase tracking-[.2em] text-[hsl(var(--muted-foreground))]">Point of sale</p><h1 className="mt-1 text-3xl font-extrabold tracking-[-.055em]">Choose products</h1><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Add multiple products, then review everything on one checkout page.</p></div>
@@ -65,16 +77,6 @@ export default function SalesStorefront() {
         </article>;
       })}
     </div> : <div className="rounded-3xl border border-dashed p-12 text-center"><ShoppingCart className="mx-auto mb-3 h-8 w-8 text-[hsl(var(--muted-foreground))]"/><b>No products found</b><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Try another search or category.</p></div>}
-
-    {count > 0 && <div className="fixed bottom-[76px] left-3 right-3 z-40 mx-auto w-auto max-w-3xl pb-1 md:bottom-6 md:left-auto md:right-6 md:inset-x-auto md:w-auto">
-      <div className="rounded-3xl border border-white/10 bg-[hsl(var(--primary))] p-3 text-[hsl(var(--primary-foreground))] shadow-2xl shadow-black/30 ring-1 ring-black/5 backdrop-blur-xl">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/15"><ShoppingCart className="h-5 w-5"/></div>
-          <div className="min-w-0 flex-1"><p className="text-[10px] font-semibold uppercase tracking-[.15em] opacity-60">Current cart</p><p className="truncate text-sm font-extrabold">{count} {count === 1 ? 'item' : 'items'} · {money(total)}</p></div>
-          <div className="hidden max-w-[250px] items-center gap-1 sm:flex">{cartItems.slice(0, 2).map(x => <span key={x.productId} className="rounded-full bg-white/10 px-2 py-1 text-[10px]">{x.product?.name} ×{x.quantity}</span>)}</div>
-          <button onClick={() => setLocation('/sales/checkout')} className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-white px-4 py-3 text-xs font-extrabold text-[hsl(var(--primary))] shadow-lg">Review & checkout <ArrowRight className="h-4 w-4"/></button>
-        </div>
-      </div>
-    </div>}
+    {typeof document !== 'undefined' && createPortal(cartBar, document.body)}
   </div>;
 }
