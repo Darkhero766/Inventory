@@ -14,6 +14,16 @@ function replace(file, from, to, label) {
   fs.writeFileSync(file, source.replace(from, to), 'utf8');
 }
 
+function replaceRegex(file, pattern, replacement, label) {
+  const source = fs.readFileSync(file, 'utf8');
+  if (source.includes(replacement)) return;
+  if (!pattern.test(source)) {
+    console.warn(`Production patch target not found (${label}) in ${path.relative(process.cwd(), file)}; skipping.`);
+    return;
+  }
+  fs.writeFileSync(file, source.replace(pattern, replacement), 'utf8');
+}
+
 // Never make login wait for the complete inventory hydration. The UI can render immediately;
 // hydration updates the tenant cache in the background.
 replace(auth,
@@ -29,15 +39,18 @@ replace(auth,
   "const s=await buildSession(user);write(SESSION_KEY,s);write(PROFILE_KEY,s);if(alive)setSession(s);void hydrateInventoryState();",
   'session non-blocking hydration');
 
-// Checkout must write the sale, stock, customer and EMI plan to Supabase, not only to the browser cache.
+// Checkout writes sale, stock, customer and EMI data to Supabase. The database uses UUID primary
+// keys plus the browser-generated ids in client_id, so cloud-crud handles that translation.
 replace(checkout,
   "import { hydrateInventoryState, resetCloudHydration } from '@/lib/cloud-sync';",
   "import { hydrateInventoryState, resetCloudHydration } from '@/lib/cloud-sync';\nimport { cloudAdjustStock, cloudCreateEmiPlan, cloudCreateSale, cloudUpsertCustomer } from '@/lib/cloud-crud';",
   'checkout cloud CRUD import');
-replace(checkout,
-  "else {cid=`cus-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;const next={id:cid,name:customerName.trim(),phone:customerPhone.trim(),createdAt:new Date().toISOString()} as Customer;const all=[next,...customers];writeStore('keystone-customers',all);setCustomers(all);}",
-  "else {cid=`cus-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;const next={id:cid,name:customerName.trim(),phone:customerPhone.trim(),createdAt:new Date().toISOString()} as Customer;await cloudUpsertCustomer(next);const all=[next,...customers];writeStore('keystone-customers',all);setCustomers(all);}",
+
+replaceRegex(checkout,
+  /if\(!cid&&customerName\.trim\(\)&&customerPhone\.trim\(\)\)\{[\s\S]*?\n   \}/,
+  "if(!cid&&customerName.trim()&&customerPhone.trim()){\n    const existing=customers.find(c=>c.phone.trim()===customerPhone.trim());\n    if(existing)cid=existing.id;\n    else{cid=`cus-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;const c={id:cid,name:customerName.trim(),phone:customerPhone.trim(),createdAt:new Date().toISOString()} as Customer;await cloudUpsertCustomer(c);const next=[c,...customers];setCustomers(next);writeStore('keystone-customers',next)}\n   }",
   'checkout customer cloud persistence');
+
 replace(checkout,
   "writeStore('keystone-sales',[sale,...readStore<Sale[]>('keystone-sales',[])]); writeStore('keystone-products',nextProducts); setProducts(nextProducts);",
   "await cloudCreateSale(sale,cost,profit); await Promise.all(items.map(i=>cloudAdjustStock(i.productId,-i.quantity))); writeStore('keystone-sales',[sale,...readStore<Sale[]>('keystone-sales',[])]); writeStore('keystone-products',nextProducts); setProducts(nextProducts);",
