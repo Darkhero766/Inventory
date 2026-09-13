@@ -3,44 +3,35 @@ import fs from 'node:fs';
 const file = 'artifacts/electronics-inventory/src/pages/sales-storefront.tsx';
 let source = fs.readFileSync(file, 'utf8');
 
-// The cart belongs to the sales page document flow. It must appear immediately
-// after the product grid, above the fixed bottom navigation, and move away as
-// the cashier scrolls. It must NOT be fixed/sticky to the viewport.
-const fixedPatterns = [
-  /className=\"fixed inset-x-3 bottom-\[88px\] z-40 mx-auto w-auto max-w-3xl md:inset-x-auto md:bottom-6\"/,
-  /className=\"fixed bottom-20 left-1\/2 z-40 w-\[calc\(100%-24px\)\] max-w-2xl -translate-x-1\/2 rounded-2xl[^\"]*\"/,
-  /className=\"fixed bottom-20[^\"]*max-w-2xl[^\"]*\"/,
-];
+// The cart is a viewport-level action bar on mobile. It must stay visible while
+// the product list scrolls and sit directly above the fixed bottom navigation.
+// On desktop it returns to normal document flow.
+const fixedClass = 'className="fixed inset-x-3 bottom-[88px] z-40 mx-auto w-auto max-w-3xl md:relative md:inset-auto md:mx-auto md:mt-6 md:mb-6 md:w-full"';
 
-const flowClass = 'className="relative z-20 mx-auto mt-6 mb-28 w-full max-w-3xl"';
+const positionPatterns = [
+  /className="relative z-20 mx-auto mt-6 mb-28 w-full max-w-3xl"/,
+  /className="relative z-20 mx-auto mt-7 mb-28 w-full max-w-3xl"/,
+  /className="relative z-20 mx-auto mt-6 mb-24 w-full max-w-3xl"/,
+  /className="fixed bottom-20 left-1\/2 z-40 w-\[calc\(100%-24px\)\] max-w-2xl -translate-x-1\/2 rounded-2xl[^\"]*"/,
+  /className="fixed bottom-20[^\"]*max-w-2xl[^\"]*"/,
+  /className="fixed inset-x-3 bottom-\[88px\] z-40[^\"]*"/,
+];
 
 let changed = false;
-for (const pattern of fixedPatterns) {
+for (const pattern of positionPatterns) {
   if (pattern.test(source)) {
-    source = source.replace(pattern, flowClass);
+    source = source.replace(pattern, fixedClass);
     changed = true;
-    console.log('Sales cart converted from viewport-fixed to normal document flow.');
-    break;
-  }
-}
-
-// Normalize older flow variants so the cart has enough space above the fixed
-// bottom navigation while still scrolling naturally with the product list.
-const oldFlowPatterns = [
-  /className=\"relative z-20 mx-auto mt-7 mb-28 w-full max-w-3xl\"/,
-  /className=\"relative z-20 mx-auto mt-6 mb-24 w-full max-w-3xl\"/,
-];
-for (const pattern of oldFlowPatterns) {
-  if (pattern.test(source)) {
-    source = source.replace(pattern, flowClass);
-    changed = true;
-    console.log('Sales cart flow spacing normalized above bottom navigation.');
     break;
   }
 }
 
 if (!changed) {
-  console.log('Sales cart already uses normal document flow; no position patch needed.');
+  // If the cart is already correctly positioned, leave it untouched. This
+  // keeps the build patch idempotent and avoids rewriting unrelated code.
+  console.log('Sales cart already uses the mobile floating position.');
+} else {
+  console.log('Sales cart fixed above the mobile bottom navigation.');
 }
 
 // Selected products must stay visible in the storefront so the cashier can
