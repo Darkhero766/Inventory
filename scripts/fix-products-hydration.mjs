@@ -4,8 +4,12 @@ const file = 'artifacts/electronics-inventory/src/lib/cloud-sync.ts';
 let src = fs.readFileSync(file, 'utf8');
 
 // Product rows are the only relational dataset still missing after account
-// hydration. Do not let a product-only RLS/PostgREST/schema issue erase the
-// product list when the legacy tenant snapshot still contains it.
+// hydration. A schema-safe select(*) avoids failures caused by a stale/older
+// products table missing one optional column such as image_url.
+src = src.replace(
+  "client.from('products').select('id,client_id,name,brand,category,model,sku,serial_number,imei,purchase_price,selling_price,mrp,stock,min_stock,warranty,image_url,created_at').eq('owner_id', ownerId).order('created_at', { ascending: false }),",
+  "client.from('products').select('*').eq('owner_id', ownerId).order('created_at', { ascending: false }),",
+);
 src = src.replace(
   "const rawProducts = productsRes.data ?? [];\n  const rawCustomers = customersRes.data ?? [];",
   "let rawProducts = productsRes.data ?? [];\n  const rawCustomers = customersRes.data ?? [];",
@@ -23,4 +27,4 @@ const replacement = `  if (products.length > 0) {\n    localStorage.setItem('key
 if (src.includes(productWrite)) src = src.replace(productWrite, replacement);
 
 fs.writeFileSync(file, src);
-console.log('Product hydration fallback applied.');
+console.log('Product hydration fallback applied with schema-safe products query.');
