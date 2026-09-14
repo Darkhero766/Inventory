@@ -24,7 +24,7 @@ const replacements = [
 
 for (const [from, to] of replacements) {
   if (!source.includes(from)) throw new Error(`Auth patch target not found: ${from}`);
-  source = source.replace(from, to);
+  source = source.split(from).join(to);
 }
 
 fs.writeFileSync(path, source);
