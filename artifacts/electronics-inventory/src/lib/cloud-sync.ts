@@ -4,6 +4,7 @@ const KEYS = ['keystone-products','keystone-history','keystone-purchases','keyst
 const OWNER_KEY = 'keystone-active-owner-id-v1';
 let hydrating = false;
 let bootPromise: Promise<boolean> | null = null;
+let bootOwner: string | null = null;
 let syncTimer: ReturnType<typeof setTimeout> | null = null;
 let syncChain: Promise<void> = Promise.resolve();
 
@@ -37,8 +38,6 @@ async function hydrateRelational() {
   const rawSales = salesRes.data ?? [];
   const rawEmi = emiRes.data ?? [];
 
-  // Always keep the browser's IDs equal to the database client_id, never the
-  // generated UUID. This preserves relationships when the next snapshot sync runs.
   const productClientByDbId = new Map(rawProducts.map((p: any) => [String(p.id), String(p.client_id)]));
   const customerClientByDbId = new Map(rawCustomers.map((c: any) => [String(c.id), String(c.client_id)]));
   const saleClientByDbId = new Map(rawSales.map((s: any) => [String(s.id), String(s.client_id)]));
@@ -102,6 +101,10 @@ async function hydrateRelational() {
 async function syncSnapshot() {
   const client = supabase;
   if (!client || typeof window === 'undefined' || hydrating || !(await ensureSession())) return;
+  const ownerId = await currentUserId();
+  const cachedOwner = localStorage.getItem(OWNER_KEY);
+  // Never push stale state from the previous account into the newly signed-in account.
+  if (!ownerId || cachedOwner !== ownerId) return;
   const state: Record<string, unknown> = {};
   for (const key of KEYS) {
     try { state[key] = JSON.parse(localStorage.getItem(key) ?? '[]'); } catch { state[key] = []; }
@@ -113,15 +116,25 @@ async function syncSnapshot() {
 export async function hydrateInventoryState() {
   const client = supabase;
   if (!client || typeof window === 'undefined') return false;
-  if (bootPromise) return bootPromise;
+  const ownerId = await currentUserId();
+  if (!ownerId || !(await ensureSession())) return false;
+
+  // The previous implementation cached one boot promise forever. After a user
+  // switch, that promise belonged to the previous owner, so the new account
+  // never fetched its Supabase rows. Cache hydration per authenticated owner.
+  if (bootPromise && bootOwner === ownerId) return bootPromise;
+  if (bootOwner !== ownerId) {
+    bootPromise = null;
+    bootOwner = ownerId;
+    const cachedOwner = localStorage.getItem(OWNER_KEY);
+    if (cachedOwner !== ownerId) clearLocalInventoryCache();
+  }
+
   bootPromise = (async () => {
-    if (!(await ensureSession())) return false;
     hydrating = true;
     try {
-      const ownerId = await currentUserId();
-      if (!ownerId) return false;
-      const cachedOwner = localStorage.getItem(OWNER_KEY);
-      if (cachedOwner !== ownerId) clearLocalInventoryCache();
+      const activeOwner = await currentUserId();
+      if (!activeOwner || activeOwner !== ownerId) return false;
       localStorage.setItem(OWNER_KEY, ownerId);
       const loaded = await hydrateRelational();
       notifyHydrated();
@@ -131,7 +144,7 @@ export async function hydrateInventoryState() {
   return bootPromise;
 }
 
-export function resetCloudHydration() { bootPromise = null; }
+export function resetCloudHydration() { bootPromise = null; bootOwner = null; }
 export function clearTenantCache() { clearLocalInventoryCache(); localStorage.removeItem(OWNER_KEY); resetCloudHydration(); }
 export function syncInventoryState() {
   if (!supabase || typeof window === 'undefined' || hydrating) return;
