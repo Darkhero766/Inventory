@@ -11,43 +11,42 @@ import './ui-polish.css';
 import './ui-upgrade.css';
 
 function CloudHydrationGate({ children }: { children: ReactNode }) {
-  const [, setReady] = useState(false);
-  const [, setOwnerId] = useState<string | null>(null);
+  const [ready, setReady] = useState(() => !supabase);
 
   useEffect(() => {
-    if (!supabase) return;
+    if (!supabase) {
+      setReady(true);
+      return;
+    }
     let alive = true;
 
     const hydrateForUser = async (userId: string | null) => {
       if (!userId) {
         clearTenantCache();
         resetCloudHydration();
-        if (alive) {
-          setOwnerId(null);
-          setReady(false);
-        }
+        if (alive) setReady(false);
         return;
       }
 
-      // Do not block the first paint on Supabase. The application already has
-      // a local cache and individual pages can render from it immediately.
-      // Cloud data is refreshed in the background and the hydration event lets
-      // interested screens update when it is ready.
-      if (alive) {
-        setOwnerId(userId);
-        setReady(true);
-      }
-
+      // IMPORTANT: do not mount InventoryProvider until the tenant's cloud
+      // state has been loaded. InventoryProvider initializes React state from
+      // localStorage; mounting it first creates the startup race that used to
+      // leave a perfectly valid Supabase tenant showing zero rows.
+      if (alive) setReady(false);
       try {
         await hydrateInventoryState();
       } catch (error) {
         console.warn('[cloud] background hydration failed:', error);
+      } finally {
+        if (alive) setReady(true);
       }
     };
 
     supabase.auth.getSession().then(({ data }) => {
       void hydrateForUser(data.session?.user?.id ?? null);
-    }).catch(() => undefined);
+    }).catch(() => {
+      if (alive) setReady(true);
+    });
 
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
       void hydrateForUser(session?.user?.id ?? null);
@@ -60,9 +59,17 @@ function CloudHydrationGate({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // AuthGate is responsible for deciding whether a user is signed in. Once
-  // mounted, always paint the app immediately instead of showing a blank page
-  // while several Supabase queries complete.
+  if (!ready) {
+    return (
+      <div className="min-h-screen bg-[#f7f7fb] flex items-center justify-center text-slate-500">
+        <div className="text-center">
+          <div className="mx-auto mb-3 h-9 w-9 animate-spin rounded-full border-2 border-slate-200 border-t-violet-600" />
+          <p className="text-sm font-semibold">Loading your shop…</p>
+        </div>
+      </div>
+    );
+  }
+
   return <>{children}</>;
 }
 
