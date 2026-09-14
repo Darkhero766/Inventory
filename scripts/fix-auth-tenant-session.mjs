@@ -6,7 +6,7 @@ let source = fs.readFileSync(path, 'utf8');
 const replacements = [
   [
     "import { hydrateInventoryState } from './lib/cloud-sync';",
-    "import { hydrateInventoryState } from './lib/cloud-sync';\nconst clearTenantCache=()=>{for(const key of ['keystone-products','keystone-history','keystone-purchases','keystone-sales','keystone-customers','keystone-emi-plans','keystone-emi-payments','keystone-active-owner-id-v1'])localStorage.removeItem(key);};",
+    "import { hydrateInventoryState } from './lib/cloud-sync';",
   ],
   [
     "useState<Session|null>(()=>read<Session|null>(SESSION_KEY,null))",
