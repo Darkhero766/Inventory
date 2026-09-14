@@ -14,6 +14,31 @@ const notifyHydrated = () => { if (typeof window !== 'undefined') window.dispatc
 async function currentUserId() { const client = supabase; if (!client) return null; const { data } = await client.auth.getUser(); return data.user?.id ?? null; }
 async function ensureSession() { const client = supabase; if (!client) return false; const { data } = await client.auth.getSession(); return Boolean(data.session); }
 
+function writeSnapshotState(state: any) {
+  const products = Array.isArray(state?.['keystone-products']) ? state['keystone-products'] : [];
+  const customers = Array.isArray(state?.['keystone-customers']) ? state['keystone-customers'] : [];
+  const sales = Array.isArray(state?.['keystone-sales']) ? state['keystone-sales'] : [];
+  const emiPlans = Array.isArray(state?.['keystone-emi-plans']) ? state['keystone-emi-plans'] : [];
+  const emiPayments = Array.isArray(state?.['keystone-emi-payments']) ? state['keystone-emi-payments'] : [];
+  const history = Array.isArray(state?.['keystone-history']) ? state['keystone-history'] : [];
+  const purchases = Array.isArray(state?.['keystone-purchases']) ? state['keystone-purchases'] : [];
+  localStorage.setItem('keystone-products', JSON.stringify(products));
+  localStorage.setItem('keystone-customers', JSON.stringify(customers));
+  localStorage.setItem('keystone-sales', JSON.stringify(sales));
+  localStorage.setItem('keystone-emi-plans', JSON.stringify(emiPlans));
+  localStorage.setItem('keystone-emi-payments', JSON.stringify(emiPayments));
+  localStorage.setItem('keystone-history', JSON.stringify(history));
+  localStorage.setItem('keystone-purchases', JSON.stringify(purchases));
+}
+
+async function hydrateSnapshotFallback(client: NonNullable<typeof supabase>, ownerId: string) {
+  const { data, error } = await client.from('inventory_state').select('state,updated_at').eq('owner_id', ownerId).eq('workspace_key', 'default').maybeSingle();
+  if (error) { console.warn('[cloud] snapshot fallback failed:', error.message); return false; }
+  if (!data?.state) return false;
+  writeSnapshotState(data.state);
+  return true;
+}
+
 async function hydrateRelational() {
   const client = supabase;
   if (!client || !(await ensureSession())) return false;
@@ -31,64 +56,44 @@ async function hydrateRelational() {
 
   const results = [productsRes, customersRes, salesRes, itemsRes, emiRes, paymentsRes];
   const failed = results.find(r => r.error);
-  if (failed) { console.warn('[cloud] relational hydration failed:', failed.error?.message); return false; }
+  if (failed) {
+    console.warn('[cloud] relational hydration failed:', failed.error?.message);
+    return hydrateSnapshotFallback(client, ownerId);
+  }
 
   const rawProducts = productsRes.data ?? [];
   const rawCustomers = customersRes.data ?? [];
   const rawSales = salesRes.data ?? [];
   const rawEmi = emiRes.data ?? [];
 
+  // If the relational migration has not yet been run (or the account still has
+  // only the legacy snapshot), preserve the existing tenant data instead of
+  // replacing it with empty arrays.
+  const relationalHasData = rawProducts.length + rawCustomers.length + rawSales.length + rawEmi.length > 0;
+  if (!relationalHasData) return hydrateSnapshotFallback(client, ownerId);
+
   const productClientByDbId = new Map(rawProducts.map((p: any) => [String(p.id), String(p.client_id)]));
   const customerClientByDbId = new Map(rawCustomers.map((c: any) => [String(c.id), String(c.client_id)]));
   const saleClientByDbId = new Map(rawSales.map((s: any) => [String(s.id), String(s.client_id)]));
   const emiClientByDbId = new Map(rawEmi.map((e: any) => [String(e.id), String(e.client_id)]));
 
-  const products = rawProducts.map((p: any) => ({
-    id:String(p.client_id), name:p.name, brand:p.brand??'', category:p.category, model:p.model??'', sku:p.sku??'',
-    purchasePrice:Number(p.purchase_price??0), sellingPrice:Number(p.selling_price??0), mrp:Number(p.mrp??p.selling_price??0),
-    quantity:Number(p.stock??0), minStock:Number(p.min_stock??0), warranty:p.warranty??'', image:p.image_url??'', createdAt:p.created_at,
-    serialNumber:p.serial_number??undefined, imei:p.imei??undefined,
-  }));
-  const customers = rawCustomers.map((c: any) => ({
-    id:String(c.client_id), name:c.name??'', phone:c.phone??'', alternatePhone:c.alternate_phone??undefined,
-    email:c.email??undefined, address:c.address??undefined, createdAt:c.created_at,
-  }));
+  const products = rawProducts.map((p: any) => ({ id:String(p.client_id), name:p.name, brand:p.brand??'', category:p.category, model:p.model??'', sku:p.sku??'', purchasePrice:Number(p.purchase_price??0), sellingPrice:Number(p.selling_price??0), mrp:Number(p.mrp??p.selling_price??0), quantity:Number(p.stock??0), minStock:Number(p.min_stock??0), warranty:p.warranty??'', image:p.image_url??'', createdAt:p.created_at, serialNumber:p.serial_number??undefined, imei:p.imei??undefined }));
+  const customers = rawCustomers.map((c: any) => ({ id:String(c.client_id), name:c.name??'', phone:c.phone??'', alternatePhone:c.alternate_phone??undefined, email:c.email??undefined, address:c.address??undefined, createdAt:c.created_at }));
 
   const itemsBySale = new Map<string, Array<Record<string, unknown>>>();
   for (const row of itemsRes.data ?? []) {
     const product = (row as any).products;
     const saleKey = saleClientByDbId.get(String((row as any).sale_id)) ?? String((row as any).sale_id);
     const list = itemsBySale.get(saleKey) ?? [];
-    list.push({
-      productId:productClientByDbId.get(String(product?.id ?? (row as any).product_id)) ?? String(product?.client_id ?? (row as any).product_id),
-      productName:product?.name??'Product', quantity:Number((row as any).quantity??0), price:Number((row as any).unit_price??0),
-      discount:Number((row as any).discount??0), serialNumber:product?.serial_number??undefined, imei:product?.imei??undefined,
-    });
+    list.push({ productId:productClientByDbId.get(String(product?.id ?? (row as any).product_id)) ?? String(product?.client_id ?? (row as any).product_id), productName:product?.name??'Product', quantity:Number((row as any).quantity??0), price:Number((row as any).unit_price??0), discount:Number((row as any).discount??0), serialNumber:product?.serial_number??undefined, imei:product?.imei??undefined });
     itemsBySale.set(saleKey,list);
   }
 
   const emiSaleIds = new Set(rawEmi.map((e:any) => String(e.sale_id)));
-  const sales = rawSales.map((s:any) => ({
-    id:String(s.client_id), date:s.sale_date, invoice:s.invoice_number,
-    customerId:customerClientByDbId.get(String(s.customer_id)) ?? undefined, customerName:s.customers?.name??undefined,
-    items:(itemsBySale.get(String(s.client_id))??[]) as Array<Record<string,unknown>>, subtotal:Number(s.subtotal??0),
-    discount:Number(s.discount_amount??0), total:Number(s.final_amount??0), payment:emiSaleIds.has(String(s.id))?'EMI':(s.payment_method??''),
-    purchaseCost:Number(s.purchase_cost??0), profit:Number(s.profit??0), discountType:s.discount_type??undefined,
-    discountValue:Number(s.discount_value??0), status:s.status,
-  }));
+  const sales = rawSales.map((s:any) => ({ id:String(s.client_id), date:s.sale_date, invoice:s.invoice_number, customerId:customerClientByDbId.get(String(s.customer_id)) ?? undefined, customerName:s.customers?.name??undefined, items:(itemsBySale.get(String(s.client_id))??[]) as Array<Record<string,unknown>>, subtotal:Number(s.subtotal??0), discount:Number(s.discount_amount??0), total:Number(s.final_amount??0), payment:emiSaleIds.has(String(s.id))?'EMI':(s.payment_method??''), purchaseCost:Number(s.purchase_cost??0), profit:Number(s.profit??0), discountType:s.discount_type??undefined, discountValue:Number(s.discount_value??0), status:s.status }));
 
-  const emiPlans = rawEmi.map((e:any) => ({
-    id:String(e.client_id), saleId:saleClientByDbId.get(String(e.sale_id)) ?? String(e.sale_id),
-    customerId:customerClientByDbId.get(String(e.customer_id)) ?? String(e.customer_id), totalAmount:Number(e.total_amount??0),
-    downPayment:Number(e.down_payment??0), financedAmount:Number(e.financed_amount??0), emiAmount:Number(e.emi_amount??0),
-    installments:Number(e.installments??0), paidInstallments:Number(e.paid_installments??0), outstandingAmount:Number(e.outstanding_amount??0),
-    startDate:e.start_date, nextDueDate:e.next_due_date, endDate:e.end_date, frequency:e.frequency, status:e.status,
-    interestRate:Number(e.interest_rate??0), totalInterest:Number(e.total_interest??0),
-  }));
-  const emiPayments = (paymentsRes.data??[]).map((p:any) => ({
-    id:String(p.client_id), emiPlanId:emiClientByDbId.get(String(p.emi_plan_id)) ?? String(p.emi_plan_id),
-    installmentNumber:Number(p.installment_number??0), dueDate:p.due_date, amount:Number(p.amount??0), paidDate:p.paid_date??undefined, status:p.status,
-  }));
+  const emiPlans = rawEmi.map((e:any) => ({ id:String(e.client_id), saleId:saleClientByDbId.get(String(e.sale_id)) ?? String(e.sale_id), customerId:customerClientByDbId.get(String(e.customer_id)) ?? String(e.customer_id), totalAmount:Number(e.total_amount??0), downPayment:Number(e.down_payment??0), financedAmount:Number(e.financed_amount??0), emiAmount:Number(e.emi_amount??0), installments:Number(e.installments??0), paidInstallments:Number(e.paid_installments??0), outstandingAmount:Number(e.outstanding_amount??0), startDate:e.start_date, nextDueDate:e.next_due_date, endDate:e.end_date, frequency:e.frequency, status:e.status, interestRate:Number(e.interest_rate??0), totalInterest:Number(e.total_interest??0) }));
+  const emiPayments = (paymentsRes.data??[]).map((p:any) => ({ id:String(p.client_id), emiPlanId:emiClientByDbId.get(String(p.emi_plan_id)) ?? String(p.emi_plan_id), installmentNumber:Number(p.installment_number??0), dueDate:p.due_date, amount:Number(p.amount??0), paidDate:p.paid_date??undefined, status:p.status }));
 
   localStorage.setItem('keystone-products',JSON.stringify(products));
   localStorage.setItem('keystone-customers',JSON.stringify(customers));
@@ -103,12 +108,9 @@ async function syncSnapshot() {
   if (!client || typeof window === 'undefined' || hydrating || !(await ensureSession())) return;
   const ownerId = await currentUserId();
   const cachedOwner = localStorage.getItem(OWNER_KEY);
-  // Never push stale state from the previous account into the newly signed-in account.
   if (!ownerId || cachedOwner !== ownerId) return;
   const state: Record<string, unknown> = {};
-  for (const key of KEYS) {
-    try { state[key] = JSON.parse(localStorage.getItem(key) ?? '[]'); } catch { state[key] = []; }
-  }
+  for (const key of KEYS) { try { state[key] = JSON.parse(localStorage.getItem(key) ?? '[]'); } catch { state[key] = []; } }
   const { error } = await client.rpc('sync_inventory_snapshot', { p_state: state });
   if (error) console.warn('[cloud] snapshot sync failed:', error.message);
 }
@@ -118,10 +120,6 @@ export async function hydrateInventoryState() {
   if (!client || typeof window === 'undefined') return false;
   const ownerId = await currentUserId();
   if (!ownerId || !(await ensureSession())) return false;
-
-  // The previous implementation cached one boot promise forever. After a user
-  // switch, that promise belonged to the previous owner, so the new account
-  // never fetched its Supabase rows. Cache hydration per authenticated owner.
   if (bootPromise && bootOwner === ownerId) return bootPromise;
   if (bootOwner !== ownerId) {
     bootPromise = null;
@@ -129,7 +127,6 @@ export async function hydrateInventoryState() {
     const cachedOwner = localStorage.getItem(OWNER_KEY);
     if (cachedOwner !== ownerId) clearLocalInventoryCache();
   }
-
   bootPromise = (async () => {
     hydrating = true;
     try {
@@ -149,9 +146,6 @@ export function clearTenantCache() { clearLocalInventoryCache(); localStorage.re
 export function syncInventoryState() {
   if (!supabase || typeof window === 'undefined' || hydrating) return;
   if (syncTimer) clearTimeout(syncTimer);
-  syncTimer = setTimeout(() => {
-    syncTimer = null;
-    syncChain = syncChain.then(() => syncSnapshot()).catch(error => console.warn('[cloud] snapshot sync queue failed:', error));
-  }, 350);
+  syncTimer = setTimeout(() => { syncTimer = null; syncChain = syncChain.then(() => syncSnapshot()).catch(error => console.warn('[cloud] snapshot sync queue failed:', error)); }, 350);
 }
 export const cloudSyncConfigured = () => Boolean(supabase);
