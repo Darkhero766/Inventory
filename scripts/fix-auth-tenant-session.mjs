@@ -3,15 +3,10 @@ import fs from 'node:fs';
 const path = 'artifacts/electronics-inventory/src/auth.tsx';
 let source = fs.readFileSync(path, 'utf8');
 
-// Keep exactly one cloud-sync import. Auth must use Supabase's persisted session
-// as the source of truth instead of trusting the previous browser-local session.
 source = source.replace(/import \{[^\n]*\} from '\.\/lib\/cloud-sync';/, "import { clearTenantCache, hydrateInventoryState } from './lib/cloud-sync';");
 if (!source.includes("import { clearTenantCache, hydrateInventoryState } from './lib/cloud-sync';")) {
   source = source.replace("import { supabase, supabaseConfigured } from './lib/supabase';", "import { supabase, supabaseConfigured } from './lib/supabase';\nimport { clearTenantCache, hydrateInventoryState } from './lib/cloud-sync';");
 }
-
-// Remove any old local declaration left by previous patches. clearTenantCache must
-// only come from cloud-sync so logout and account switching cannot diverge.
 source = source.replace(/\n(?:const|function) clearTenantCache[^\n]*\n?/g, '\n');
 
 const start = source.indexOf('export function AuthGate');
@@ -24,12 +19,14 @@ const replacement = `export function AuthGate({children}:{children:ReactNode}){
  useEffect(()=>{
    if(!supabaseConfigured||!supabase){setAuthReady(true);return;}
    let alive=true;
+   let syncGeneration=0;
    const sync=async(user:any)=>{
+     const generation=++syncGeneration;
      const email=String(user?.email||'').trim().toLowerCase();
-     if(!email){if(alive)setAuthReady(true);return;}
+     if(!email){if(alive&&generation===syncGeneration){clearTenantCache();localStorage.removeItem(SESSION_KEY);localStorage.removeItem(PROFILE_KEY);setSession(null);setAuthReady(true);}return;}
      if(user?.app_metadata?.provider==='google'&&email!==ADMIN_EMAIL){
        await supabase!.auth.signOut();
-       if(alive){setSession(null);setAuthReady(true);}
+       if(alive&&generation===syncGeneration){clearTenantCache();setSession(null);setAuthReady(true);}
        return;
      }
      try{
@@ -37,22 +34,25 @@ const replacement = `export function AuthGate({children}:{children:ReactNode}){
        const previousOwner=localStorage.getItem(ownerKey);
        if(previousOwner&&previousOwner!==user.id) clearTenantCache();
        const s=await buildSession(user);
-       // Hydrate BEFORE rendering the inventory application. This removes the
-       // race where InventoryProvider mounts with an empty cache and misses the
-       // one-shot hydration event.
        const loaded=await hydrateInventoryState();
-       if(!alive)return;
+       if(!alive||generation!==syncGeneration)return;
        write(SESSION_KEY,s);write(PROFILE_KEY,s);
        setSession(s);setAuthReady(true);
        window.dispatchEvent(new Event('keystone-session-change'));
        if(!loaded)console.warn('[auth] inventory hydration returned no data for authenticated user',user.id);
      }catch(error){
        console.warn('[auth] session bootstrap failed:',error);
-       if(alive)setAuthReady(true);
+       if(alive&&generation===syncGeneration)setAuthReady(true);
      }
    };
    supabase.auth.getSession().then(({data})=>{void sync(data.session?.user??null);}).catch(error=>{console.warn('[auth] getSession failed:',error);if(alive)setAuthReady(true);});
-   const {data}=supabase.auth.onAuthStateChange((_event,s)=>{if(s?.user)void sync(s.user);else if(alive){clearTenantCache();localStorage.removeItem(SESSION_KEY);localStorage.removeItem(PROFILE_KEY);setSession(null);setAuthReady(true);}});
+   const {data}=supabase.auth.onAuthStateChange((event,s)=>{
+     if(s?.user)void sync(s.user);
+     else if(event==='SIGNED_OUT'&&alive){
+       ++syncGeneration;
+       clearTenantCache();localStorage.removeItem(SESSION_KEY);localStorage.removeItem(PROFILE_KEY);setSession(null);setAuthReady(true);
+     }
+   });
    return()=>{alive=false;data.subscription.unsubscribe();};
  },[]);
  const logout=async()=>{
