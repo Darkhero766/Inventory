@@ -3,6 +3,7 @@ import path from 'node:path';
 
 const checkout = path.resolve('artifacts/electronics-inventory/src/pages/sales-checkout.tsx');
 const auth = path.resolve('artifacts/electronics-inventory/src/auth.tsx');
+const app = path.resolve('artifacts/electronics-inventory/src/App.tsx');
 
 function replace(file, from, to, label) {
   const source = fs.readFileSync(file, 'utf8');
@@ -60,4 +61,18 @@ replace(checkout,
   "await cloudCreateEmiPlan(plan,payments,dbSaleId); writeStore('keystone-emi-plans',[plan,...readStore<EmiPlan[]>('keystone-emi-plans',[])]); writeStore('keystone-emi-payments',[...payments,...readStore<EmiPayment[]>('keystone-emi-payments',[])]);",
   'checkout EMI cloud persistence');
 
+// Product creation was previously local-only. On production the next inventory hydration
+// therefore replaced the newly-created local product with the relational cloud dataset.
+// Persist NEW products to Supabase first, then keep the existing local state/navigation behavior.
+replace(app,
+  "import NotFound from '@/pages/not-found';",
+  "import NotFound from '@/pages/not-found';\nimport { cloudSaveProduct } from '@/lib/cloud-crud';",
+  'product cloud persistence import');
+
+replace(app,
+  "const submit=(e:FormEvent)=>{e.preventDefault();saveProduct({name:form.name,brand:form.brand,category:form.category as Product['category'],model:form.model,sku:form.sku,purchasePrice:Number(form.purchasePrice),sellingPrice:Number(form.sellingPrice),mrp:Number(form.mrp),quantity:Number(form.quantity),minStock:Number(form.minStock),warranty:form.warranty,image:form.image||seedProducts[0].image},id);setLocation(id?`/product/${id}`:'/inventory')};",
+  "const submit=async(e:FormEvent)=>{e.preventDefault();const data={name:form.name,brand:form.brand,category:form.category as Product['category'],model:form.model,sku:form.sku,purchasePrice:Number(form.purchasePrice),sellingPrice:Number(form.sellingPrice),mrp:Number(form.mrp),quantity:Number(form.quantity),minStock:Number(form.minStock),warranty:form.warranty,image:form.image||seedProducts[0].image};try{if(!id){const clientId=`p-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;await cloudSaveProduct({...data,id:clientId,createdAt:new Date().toISOString()});}saveProduct(data,id);setLocation(id?`/product/${id}`:'/inventory')}catch(error){console.error('[inventory] product save failed:',error);window.alert(error instanceof Error?error.message:'Product could not be saved. Please try again.')}};",
+  'new product cloud persistence');
+
 console.log('Production flow patches applied: non-blocking startup hydration and durable Supabase sales/stock/customer/EMI checkout.');
+console.log('New product creation now persists to Supabase before returning to inventory.');
