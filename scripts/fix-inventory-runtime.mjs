@@ -3,9 +3,6 @@ import fs from 'node:fs';
 const appFile = 'artifacts/electronics-inventory/src/App.tsx';
 let app = fs.readFileSync(appFile, 'utf8');
 
-// InventoryProvider must refresh React state after Supabase hydration. The old
-// listener alone was racy: AuthGate could finish hydration before this provider
-// mounted, so the one-shot event was missed and every screen stayed at zero.
 if (!app.includes("from '@/lib/cloud-sync'")) {
   app = app.replace(
     "import NotFound from '@/pages/not-found';",
@@ -32,11 +29,16 @@ if (!app.includes(oldMarker)) {
       setEmiPayments(readStore('keystone-emi-payments', []));
     };
     const onHydrated = () => reload();
+    const onSessionChange = () => {
+      void hydrateInventoryState().then(() => reload()).catch(error => console.warn('[inventory] tenant refresh failed:', error));
+    };
     window.addEventListener('keystone-inventory-hydrated', onHydrated);
+    window.addEventListener('keystone-session-change', onSessionChange);
     void hydrateInventoryState().then(() => reload()).catch(error => console.warn('[inventory] hydration refresh failed:', error));
     return () => {
       alive = false;
       window.removeEventListener('keystone-inventory-hydrated', onHydrated);
+      window.removeEventListener('keystone-session-change', onSessionChange);
     };
   }, []);`;
   app = app.replace(marker, marker + hydrationEffect);
@@ -44,12 +46,37 @@ if (!app.includes(oldMarker)) {
 
 fs.writeFileSync(appFile, app);
 
-// Relational tables are the preferred source, but older installations may have
-// valid data in inventory_state while one or more relational tables are empty.
-// Fill only missing relational datasets from the tenant snapshot and always
-// restore history/purchases, which do not have relational tables yet.
 const cloudFile = 'artifacts/electronics-inventory/src/lib/cloud-sync.ts';
 let cloud = fs.readFileSync(cloudFile, 'utf8');
+
+// Retry Supabase session reads during startup. Mobile browsers can briefly return
+// no session while the persisted refresh token is being restored; treating that
+// transient state as logged-out causes the wrong login screen and empty tenant.
+const oldCurrentUser = "async function currentUserId() { const client = supabase; if (!client) return null; const { data } = await client.auth.getUser(); return data.user?.id ?? null; }";
+const newCurrentUser = `async function currentUserId() {
+  const client = supabase;
+  if (!client) return null;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { data } = await client.auth.getUser();
+    if (data.user?.id) return data.user.id;
+    if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)));
+  }
+  return null;
+}`;
+if (cloud.includes(oldCurrentUser)) cloud = cloud.replace(oldCurrentUser, newCurrentUser);
+
+const oldEnsure = "async function ensureSession() { const client = supabase; if (!client) return false; const { data } = await client.auth.getSession(); return Boolean(data.session); }";
+const newEnsure = `async function ensureSession() {
+  const client = supabase;
+  if (!client) return false;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { data } = await client.auth.getSession();
+    if (data.session) return true;
+    if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)));
+  }
+  return false;
+}`;
+if (cloud.includes(oldEnsure)) cloud = cloud.replace(oldEnsure, newEnsure);
 
 const snapshotAnchor = "  const rawEmi = emiRes.data ?? [];";
 if (!cloud.includes("const snapshotRow = await client.from('inventory_state')")) {
@@ -74,4 +101,4 @@ if (!cloud.includes('const finalProducts = products.length')) {
 }
 
 fs.writeFileSync(cloudFile, cloud);
-console.log('Inventory startup hydration and snapshot fallback patches applied.');
+console.log('Inventory startup hydration, auth-change refresh, and snapshot fallback patches applied.');
