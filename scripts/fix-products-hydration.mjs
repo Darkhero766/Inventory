@@ -17,7 +17,9 @@ src = src.replace(
 
 const anchor = "  const rawEmi = emiRes.data ?? [];\n";
 const insertion = `  let snapshotProducts: any[] = [];\n  if (rawProducts.length === 0) {\n    try {\n      const { data: snapshotData } = await client.from('inventory_state')\n        .select('state')\n        .eq('owner_id', ownerId)\n        .eq('workspace_key', 'default')\n        .maybeSingle();\n      const candidate = snapshotData?.state?.['keystone-products'];\n      if (Array.isArray(candidate) && candidate.length > 0) {\n        snapshotProducts = candidate;\n        console.warn('[cloud] products relational query returned 0 rows; restoring products from tenant snapshot:', candidate.length);\n      }\n    } catch (error) {\n      console.warn('[cloud] product snapshot fallback failed:', error);\n    }\n  }\n`;
-if (!src.includes("let snapshotProducts: any[]")) {
+// fix-inventory-runtime.mjs may already provide snapshotProducts. Treat either
+// declaration as the shared fallback rather than redeclaring the variable.
+if (!src.includes('snapshotProducts')) {
   if (!src.includes(anchor)) throw new Error('Product hydration anchor not found.');
   src = src.replace(anchor, anchor + insertion);
 }
