@@ -39,6 +39,20 @@ async function hydrateSnapshotFallback(client: NonNullable<typeof supabase>, own
   return true;
 }
 
+async function recoverSameEmailTenant(client: NonNullable<typeof supabase>) {
+  try {
+    const { data, error } = await client.rpc('recover_same_email_tenant');
+    if (error) {
+      // Older databases will not have this optional recovery RPC. Normal hydration still works.
+      if (!/function .*recover_same_email_tenant.*does not exist|PGRST202/i.test(error.message)) console.warn('[cloud] tenant recovery skipped:', error.message);
+      return;
+    }
+    if (data?.status === 'recovered') console.info('[cloud] recovered legacy tenant:', data);
+  } catch (error) {
+    console.warn('[cloud] tenant recovery check failed:', error);
+  }
+}
+
 async function hydrateRelational() {
   const client = supabase;
   if (!client || !(await ensureSession())) return false;
@@ -66,9 +80,6 @@ async function hydrateRelational() {
   const rawSales = salesRes.data ?? [];
   const rawEmi = emiRes.data ?? [];
 
-  // If the relational migration has not yet been run (or the account still has
-  // only the legacy snapshot), preserve the existing tenant data instead of
-  // replacing it with empty arrays.
   const relationalHasData = rawProducts.length + rawCustomers.length + rawSales.length + rawEmi.length > 0;
   if (!relationalHasData) return hydrateSnapshotFallback(client, ownerId);
 
@@ -133,6 +144,7 @@ export async function hydrateInventoryState() {
       const activeOwner = await currentUserId();
       if (!activeOwner || activeOwner !== ownerId) return false;
       localStorage.setItem(OWNER_KEY, ownerId);
+      await recoverSameEmailTenant(client);
       const loaded = await hydrateRelational();
       notifyHydrated();
       return loaded;
